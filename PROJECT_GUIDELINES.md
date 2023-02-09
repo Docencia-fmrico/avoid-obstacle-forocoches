@@ -95,7 +95,7 @@ All major decisions must be unanimously agreed upon in group meetings. This will
 
 Working in this repository implies accepting the project guidelines implemented in this repository. All the members below nod to have knowledge and accept this conditions.
 
-- [ ] Javier Izquierdo
+- [X] Javier Izquierdo
 - [X] Sebastian Mayorquin 
 - [ ] Luis Moreno
 - [ ] Alberto Leon
