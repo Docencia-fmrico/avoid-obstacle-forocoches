@@ -47,3 +47,6 @@ Doxyfile
 *.synctex.gz
 *.log
 *.aux
+
+# Temp files
+tmp/*
