@@ -98,4 +98,4 @@ Working in this repository implies accepting the project guidelines implemented 
 - [X] Javier Izquierdo
 - [X] Sebastian Mayorquin 
 - [ ] Luis Moreno
-- [ ] Alberto Leon
+- [X] Alberto Leon
