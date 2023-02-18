@@ -30,6 +30,27 @@ RandomWalkerNode::RandomWalkerNode()
   timer_ = create_wall_timer(
     500ms, std::bind(&RandomWalkerNode::control_cycle, this));
 
+  // Declare parameter
+  declare_parameter("SPEED_STOP_LINEAR", SPEED_STOP_LINEAR);
+  declare_parameter("SPEED_STOP_ANGULAR", SPEED_STOP_ANGULAR);
+  declare_parameter("SPEED_FORWARD_LINEAR", SPEED_FORWARD_LINEAR);
+  declare_parameter("SPEED_FORWARD_ANGULAR", SPEED_FORWARD_ANGULAR);
+  declare_parameter("SPEED_TURN_LINEAR", SPEED_TURN_LINEAR);
+  declare_parameter("SPEED_TURN_ANGULAR", SPEED_TURN_ANGULAR);
+  declare_parameter("OBSTACLE_DISTANCE_THRESHOLD", OBSTACLE_DISTANCE_THRESHOLD);
+  declare_parameter("SCAN_RANGE", SCAN_RANGE);
+
+
+  // Retrieve parameters
+  get_parameter("SPEED_STOP_LINEAR", SPEED_STOP_LINEAR);
+  get_parameter("SPEED_STOP_ANGULAR", SPEED_STOP_ANGULAR);
+  get_parameter("SPEED_FORWARD_LINEAR", SPEED_FORWARD_LINEAR);
+  get_parameter("SPEED_FORWARD_ANGULAR", SPEED_FORWARD_ANGULAR);
+  get_parameter("SPEED_TURN_LINEAR", SPEED_TURN_LINEAR);
+  get_parameter("SPEED_TURN_ANGULAR", SPEED_TURN_ANGULAR);
+  get_parameter("OBSTACLE_DISTANCE_THRESHOLD", OBSTACLE_DISTANCE_THRESHOLD);
+  get_parameter("SCAN_RANGE", SCAN_RANGE);
+
   // Initialize the last state to stop
   last_state_ = STOP;
 }

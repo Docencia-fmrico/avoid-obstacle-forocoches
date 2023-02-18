@@ -12,11 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch_ros.actions import Node
 
 
 def generate_launch_description():
+
+    pkg_dir = get_package_share_directory('random_walker')
+    param_file = os.path.join(pkg_dir, 'config', 'params.yaml')
 
     rand_walker_cmd = Node(
                             package='random_walker',
@@ -24,7 +29,7 @@ def generate_launch_description():
                             output='screen',
                             parameters=[{
                               'use_sim_time': True
-                            }],
+                            }, param_file],
                             arguments=['--ros-args', '--log-level', 'info'],
                             remappings=[
                               ('input_scan', '/scan'),

@@ -100,18 +100,18 @@ private:
   bool check_rotation_2_forward();
 
   // Velocity control
-  static constexpr float SPEED_STOP_LINEAR = 0.0f;
-  static constexpr float SPEED_STOP_ANGULAR = 0.0f;
-  static constexpr float SPEED_FORWARD_LINEAR = 0.3f;
-  static constexpr float SPEED_FORWARD_ANGULAR = 0.0f;
-  static constexpr float SPEED_TURN_LINEAR = 0.0f;
-  static constexpr float SPEED_TURN_ANGULAR = 0.3f;
+  float SPEED_STOP_LINEAR = 0.0f;
+  float SPEED_STOP_ANGULAR = 0.0f;
+  float SPEED_FORWARD_LINEAR = 0.3f;
+  float SPEED_FORWARD_ANGULAR = 0.0f;
+  float SPEED_TURN_LINEAR = 0.0f;
+  float SPEED_TURN_ANGULAR = 0.3f;
   const rclcpp::Duration TURNING_TIME {6s};
-  const rclcpp::Duration ROTATING_TIME {10s};
+  const rclcpp::Duration ROTATING_TIME {12s};
 
   // Laser control
-  static constexpr float OBSTACLE_DISTANCE_THRESHOLD = 1.0f;
-  static constexpr float SCAN_RANGE = 25;
+  float OBSTACLE_DISTANCE_THRESHOLD = 1.0f;
+  int SCAN_RANGE = 10;
   int obstacle_position_ = 0;  // 1 Left / -1 Right
   const rclcpp::Duration LASER_SCAN_TIMEOUT {1s};
 };
