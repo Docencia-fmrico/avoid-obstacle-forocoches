@@ -28,7 +28,7 @@ RandomWalkerNode::RandomWalkerNode()
     std::bind(&RandomWalkerNode::scan_callback, this, _1));
 
   timer_ = create_wall_timer(
-    500ms, std::bind(&RandomWalkerNode::control_cycle, this));
+    100ms, std::bind(&RandomWalkerNode::control_cycle, this));
 
   // Declare parameter
   declare_parameter("SPEED_STOP_LINEAR", SPEED_STOP_LINEAR);
@@ -90,7 +90,8 @@ void RandomWalkerNode::control_cycle()
       break;
     case FORWARD:
       out_vel_.linear.x = SPEED_FORWARD_LINEAR;
-      out_vel_.angular.z = 0;
+      out_vel_.angular.z = SPEED_FORWARD_ANGULAR;
+      finished_rotation_ = false;
       // Can go to stop or to turn
       if (check_2_stop()) {
         change_state(STOP);
@@ -100,27 +101,33 @@ void RandomWalkerNode::control_cycle()
       }
       break;
     case TURN:
-      debug_msg_.data = DebugNode::ERROR;
       out_vel_.linear.x = SPEED_TURN_LINEAR;
       out_vel_.angular.z = SPEED_TURN_ANGULAR * obstacle_position_;
-      // Can go to stop or to rotation
+      // Can go to stop or to rotation(forward if the rotation already ended)
       if (check_2_stop()) {
         change_state(STOP);
       }
       if (check_turn_2_rotation()) {
-        change_state(ROTATION);
+        if (finished_rotation_) {
+          change_state(FORWARD);
+        } else {
+          change_state(ROTATION);
+        }
       }
       break;
     case ROTATION:
-      debug_msg_.data = DebugNode::NOT_ON_GROUND;
+      finished_rotation_ = false;
       out_vel_.linear.x = SPEED_FORWARD_LINEAR;
-      out_vel_.angular.z = -(SPEED_TURN_ANGULAR * obstacle_position_);
-      // Can go to stop, forward or turn
+      out_vel_.angular.z = speed_rotation_angular_;
+      // Set rotation speed for the next rotation
+      set_rotation_time(speed_rotation_angular_);
+      // Can go to stop, forward(Turn again in the opposite direction) or turn
       if (check_2_stop()) {
         change_state(STOP);
       }
       if (check_rotation_2_forward()) {
-        change_state(FORWARD);
+        finished_rotation_ = true;
+        change_state(TURN);
       }
       if (check_2_turn()) {
         change_state(TURN);
@@ -176,18 +183,22 @@ bool RandomWalkerNode::check_2_turn()
   // Turn if the laser detects an object near
   int size = last_scan_->ranges.size();
 
-  // Right range
-  for (int i = 0; i < SCAN_RANGE; i++) {
+  // Left range
+  for (int i = 0; i < (size / SCAN_RANGE); i++) {
     if (last_scan_->ranges[i] < OBSTACLE_DISTANCE_THRESHOLD) {
-      obstacle_position_ = -1;  // Obstacle position in the right
+      obstacle_position_ = - 1;  // Obstacle position in the left
+      // Set rotation speed
+      speed_rotation_angular_ = SPEED_TURN_ANGULAR * (1 - (((float) i) / (size / SCAN_RANGE)) / 2);
       return true;
     }
   }
 
-  // Left range
-  for (int i = size - 1; i > (size - SCAN_RANGE); i--) {
+  // Right range
+  for (int i = size - 1; i > (size - (size / SCAN_RANGE)); i--) {
     if (last_scan_->ranges[i] < OBSTACLE_DISTANCE_THRESHOLD) {
-      obstacle_position_ = 1;  // Obstacle position in the left
+      obstacle_position_ = 1;  // Obstacle position in the right
+      // Set rotation speed
+      speed_rotation_angular_ = - SPEED_TURN_ANGULAR * (1 - ((size - ((float) i)) / (size / SCAN_RANGE)) / 2);
       return true;
     }
   }
@@ -198,4 +209,90 @@ bool RandomWalkerNode::check_rotation_2_forward()
 {
   // Go forward when it finishes rotating
   return (now() - state_timestamp_) > ROTATING_TIME;
+}
+
+float RandomWalkerNode::set_rotation_speed()
+{
+  // New method 
+  // lc = l0 * cos (alpha * index);
+  // c = l0 * sin (alpha * index);
+  // beta = atan2(l-lc, c);
+  // delta = atan2(c,lc)
+  // gamma = beta + delta;
+  // const gamma if it isn't object ended
+  // float alpha = last_scan_->angle_increment;  // in rads
+  float beta, delta, gamma;  // in rads
+  float lc, c; 
+  float precission = 0.2f;
+  int size = last_scan_->ranges.size();
+
+  if (obstacle_position_ == 1) {  // Object in right size
+    // See left range
+    // Get the first beta as reference
+    lc = last_scan_->ranges[0] * cos(1);
+    c = last_scan_->ranges[0] * sin(1);
+    beta = atan2(last_scan_->ranges[1] - lc, c);  // In rads
+    delta = atan2(c, lc);  // In rads
+    float ref_gamma = beta + delta;  // In rads
+
+    for (int i = 1; i < (size / SCAN_RANGE); i++) {
+      lc = last_scan_->ranges[0] * cos(i);
+      c = last_scan_->ranges[0] * sin(i);
+      beta = atan2(last_scan_->ranges[i] - lc, c);  // In rads
+      delta = atan2(c, lc);  // In rads
+      gamma = beta + delta;  // In rads
+      RCLCPP_INFO(get_logger(), "Check left size info : %d", i);
+      RCLCPP_INFO(get_logger(), "Check left size info : l0 = %f", last_scan_->ranges[0]);
+      RCLCPP_INFO(get_logger(), "Check left size info : %f of %f|%f|%f|%f",last_scan_->ranges[i] ,lc,c,beta,delta);
+      RCLCPP_INFO(get_logger(), "Check left size info : %f of %f", gamma, ref_gamma);
+      if ( !(ref_gamma + precission > gamma && ref_gamma - precission < gamma)) {
+          RCLCPP_INFO(get_logger(), "Check left size out : %d", i);
+          RCLCPP_INFO(get_logger(), "Check left size out : %f of %f", gamma, ref_gamma);
+          return - SPEED_TURN_ANGULAR * (1 - (((float) i) / (size / SCAN_RANGE)) / 2);
+      }
+
+    }
+    return - SPEED_TURN_ANGULAR / 2;
+
+  } else if (obstacle_position_ == - 1) {  // Object in left size
+    // See right range
+    // Get the first beta as reference
+    lc = last_scan_->ranges[0] * cos(size - 1);
+    c = - last_scan_->ranges[0] * sin(size - 1);
+    beta = atan2(last_scan_->ranges[(size -1)] - lc, c);  // In rads
+    delta = atan2(c, lc);  // In rads
+    float ref_gamma = beta + delta;  // In rads
+
+    for (int i = size - 1; i > (size - (size / SCAN_RANGE)); i--) {
+
+      lc = last_scan_->ranges[0] * cos(i);
+      c = - last_scan_->ranges[0] * sin(i);
+      beta = atan2(last_scan_->ranges[i] - lc, c);  // In rads
+      delta = atan2(c, lc);  // In rads
+      gamma = beta + delta;  // In rads
+
+      RCLCPP_INFO(get_logger(), "Check right size info : %d", i);
+      RCLCPP_INFO(get_logger(), "Check right size info : l0 = %f", last_scan_->ranges[0]);
+      RCLCPP_INFO(get_logger(), "Check right size info : %f of %f|%f|%f|%f",last_scan_->ranges[i] ,lc,c,beta,delta);
+      RCLCPP_INFO(get_logger(), "Check right size info : %f of %f", gamma, ref_gamma);
+
+      if ( !(ref_gamma + precission > gamma && ref_gamma - precission < gamma)) {
+          RCLCPP_INFO(get_logger(), "Check right size out : %d", i);
+          RCLCPP_INFO(get_logger(), "Check right size out : %f of %f", gamma, ref_gamma);
+          return SPEED_TURN_ANGULAR * (1 - ((size - ((float) i)) / (size / SCAN_RANGE)) / 2);
+      }
+
+    }
+    return SPEED_TURN_ANGULAR / 2;
+  }
+  return 0.0f;  // Something went wrong
+}
+
+void RandomWalkerNode::set_rotation_time(float speed)
+{
+  if (speed < 0.0f) {
+    speed *= -1;  // Make the time positive
+  }
+  RCLCPP_INFO(get_logger(), "Set time: %f", (SPEED_TURN_ANGULAR / speed) * 12);
+  rclcpp::Duration ROTATING_TIME {(SPEED_TURN_ANGULAR / speed) * 12s};
 }

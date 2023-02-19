@@ -55,6 +55,7 @@ private:
   // FSM variables
   int state_;
   int last_state_;
+  bool finished_rotation_;
   rclcpp::Time state_timestamp_;
   // FSM states
   static const int STOP = 0;
@@ -98,6 +99,16 @@ private:
    * @return false
    */
   bool check_rotation_2_forward();
+  /**
+   * @brief Placeholder
+   * @return float 
+   */
+  float set_rotation_speed();
+  /**
+   * @brief Set the rotation time
+   * @param speed: rotation speed
+   */
+  void set_rotation_time(float speed);
 
   // Velocity control
   float SPEED_STOP_LINEAR = 0.0f;
@@ -106,13 +117,14 @@ private:
   float SPEED_FORWARD_ANGULAR = 0.0f;
   float SPEED_TURN_LINEAR = 0.0f;
   float SPEED_TURN_ANGULAR = 0.3f;
+  float speed_rotation_angular_ = 0.0f;
   const rclcpp::Duration TURNING_TIME {6s};
-  const rclcpp::Duration ROTATING_TIME {12s};
+  rclcpp::Duration ROTATING_TIME {12s};
 
   // Laser control
   float OBSTACLE_DISTANCE_THRESHOLD = 1.0f;
-  int SCAN_RANGE = 10;
-  int obstacle_position_ = 0;  // 1 Left / -1 Right
+  int SCAN_RANGE = 10;  // Higher = Less vission
+  int obstacle_position_ = 0;  // -1 Left / 1 Right
   const rclcpp::Duration LASER_SCAN_TIMEOUT {1s};
 };
 
