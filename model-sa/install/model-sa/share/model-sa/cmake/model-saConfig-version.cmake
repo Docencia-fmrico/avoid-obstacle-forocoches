@@ -1,1 +1,0 @@
-/home/sam/ROS/avoid-obstacle-forocoches/model-sa/build/model-sa/ament_cmake_core/model-saConfig-version.cmake
