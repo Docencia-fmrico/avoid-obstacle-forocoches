@@ -1,0 +1,1 @@
+ament_cmake_symlink_install_targets("TARGET_FILES" "/home/sam/ROS/avoid-obstacle-forocoches/model-sa/build/model-sa/simple-controller" "TARGETS" "simple-controller" "ARCHIVE_DESTINATION" "lib" "LIBRARY_DESTINATION" "lib" "RUNTIME_DESTINATION" "lib/model-sa")

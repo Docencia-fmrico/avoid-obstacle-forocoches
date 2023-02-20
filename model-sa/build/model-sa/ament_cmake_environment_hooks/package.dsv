@@ -1,0 +1,4 @@
+source;share/model-sa/local_setup.bash
+source;share/model-sa/local_setup.dsv
+source;share/model-sa/local_setup.sh
+source;share/model-sa/local_setup.zsh
