@@ -156,6 +156,8 @@ private:
   // Laser control
   float OBSTACLE_DISTANCE_THRESHOLD = 1.0f;
   int MIN_LASER_RANGE = 4;  // Half of the range
+  float MIN_THRESHOLD = 0.4f;
+  float NON_DETECTION_THRESHOLD = 0.3f;
   int current_range = MIN_LASER_RANGE;  // Higher = less range
   int obstacle_position_ = 0;  // -1 Left / 1 Right
   const rclcpp::Duration LASER_SCAN_TIMEOUT {1s};
