@@ -3,100 +3,152 @@
   BaseController::BaseController() : Node("base_controller")
   {
      // Setting parameters
+     // TODO: Set this set of parameters as declare-param, get_param() + intialize
+     // directly with this values at the launcher
     this->AVOID_SIDE_BY_DEFAULT_ = RIGHT;
-    this->velocity_ = 0.5;
-    this->rotation_smoothness_ = 1.5;
-    this->recolocation_delay_ = 8;
+    this->velocity_ = 0.2;
+    this->rotation_smoothness_ = 2.3;
+    this->recolocation_delay_ = 22;
     this->seconds_recolocating_= velocity_*recolocation_delay_;
-    this->radious_ = 1.2;
-    this->velocity_delay_ = 1.3;
+    this->radious_ = 0.9;
+    this->velocity_delay_ = 1.5;
     this->seconds_rotating_ = (M_PI*radious_)/(velocity_*velocity_delay_);
-    this->scan_resolution_ = 21;
-    this->frontal_range_ = 0.7;
+    this->scan_resolution_ = 131;
+    this->frontal_range_ = 1;
     this->avoiding_range_ = 0.5;
-    this->danger_range_ = 0.2;
-    this->frontal_resolution_ = 5;
-    this->lateral_resolution_ = 7;
+    this->frontal_resolution_ = 51;
+    this->lateral_resolution_ = 61;
     this->isKobuki = true;
+    this->rotation_speed = 3;
+
+    // Note this parameters should be initialized here 
+    this->load_forward = 130;
+    this->load_rotating = 0;
+    this->load_relocating = 0;
+    this->load_avoiding = 0;
+    this->conflict_penalty = 120;
     
     this->intensities_ = std::vector<float>(scan_resolution_,0);
     this->ranges_ = std::vector<float>(scan_resolution_,1);
 
-    // Building Subscriber
+    // Building Subscriber to the Laser
     subscriber_ = create_subscription<sensor_msgs::msg::LaserScan>(
         "scan_raw",10,
         std::bind(&BaseController::subscription_callback, this, std::placeholders::_1));
-    // Building Publisher
+
+    // Building Publisher to the velocity node
     publisher_ = create_publisher<geometry_msgs::msg::Twist>("cmd_vel",10);
     timer_ = create_wall_timer(
-        20ms, std::bind(&BaseController::timer_callback, this));
+        10ms, std::bind(&BaseController::timer_callback, this));
 
-    // Building Publisher Radar
+    // Building Publisher to graphicate to rviz
     publisherRadar_ = create_publisher<sensor_msgs::msg::LaserScan>("my_radar",10);
     timerRadar_ = create_wall_timer(
-        20ms, std::bind(&BaseController::timer_callback_radar, this));
+        10ms, std::bind(&BaseController::timer_callback_radar, this));
   }
 
   void BaseController::subscription_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg)
   {
+    // Get the message
     auto scan = msg.get();
-    
+
+    // Save the properties
     angle_min = scan->angle_min;
     angle_max = scan->angle_max;
     std::vector<float> ranges;
+
+    // If is kobuki patch the laser (by default would be analysed as Tiago)
     if (isKobuki){
       ranges = translate_kobuki_scan(scan->ranges);
     }else{
       ranges = scan->ranges;
     }
 
+    // Sectorize the scan in function of the danger at the front 
     auto frontal_scan = sectorize(ranges,scan_resolution_,frontal_range_);
     obstacleInFront_ = obstacleAnalize(frontal_scan,frontal_resolution_);
 
+    // Sectorize the scan in function of the danger at the sides 
     auto avoiding_scan = sectorize(ranges,scan_resolution_,avoiding_range_);
     obstacleInSide_ = obstacleAnalize(avoiding_scan,lateral_resolution_);
 
-    auto danger_scan = sectorize(ranges,scan_resolution_,danger_range_);
-    obstacleInDanger_ = obstacleAnalize(danger_scan,scan_resolution_);
-
+    // Stablish best side to avoid (Inestable response if obstacle not detected) 
     sideToAvoidObstacle_ = calculate_side_to_avoid_obstacle(avoiding_scan);
-    setIntensities(frontal_scan, avoiding_scan, danger_scan);
+
+    // Reformat the scan to graphicable values 
+    setIntensities(frontal_scan, avoiding_scan);
   }
 
   void BaseController::timer_callback_radar(){
 
+      // Prepare the properties of the graphication
       radar_.angle_min = angle_min;
       radar_.angle_max = angle_max;
       radar_.angle_increment = (-angle_min + angle_max)/scan_resolution_;
-      radar_.header.frame_id = "base_footprint";
+      radar_.header.frame_id = "base_link"; // Important: This is the reference to take in Rviz2
       radar_.time_increment = 0.010;
       radar_.range_min = 0; 
-      radar_.range_max = 3; 
+      radar_.range_max = 2; 
       radar_.ranges = this->ranges_;
       radar_.intensities = this->intensities_; 
 
+      // Publish
       publisherRadar_->publish(radar_);
   }
 
   void BaseController::timer_callback()
   {
-    RCLCPP_INFO(get_logger(),"Locker: %d. %s [%s,%s,%s]", lock_remaining_,
-      (sideToAvoidObstacle_ == LEFT) ? "LEFT" : "RIGHT",
-      (obstacleInFront_) ? "FRONT" : "0",
-      (obstacleInSide_) ? "AVOID" : "0",
-      (obstacleInDanger_) ? "DANGER" : "0"
+
+    // Simple logger of the FSM
+    // TODO: Replace this logger with a debug node (if reliable)
+    RCLCPP_INFO(get_logger(),"[%d,%d,%d,%d] Locker: %d. %s [%s,%s]",
+      load_forward,     // Weight of the status 1
+      load_rotating,    // Weight of the status 2
+      load_avoiding,    // Weight of the status 3
+      load_relocating,  // Weight of the status 4
+      lock_remaining_,  // Punishment aplplied for direction hesitation (at the time)
+      (sideToAvoidObstacle_ == LEFT) ? "LEFT" : "RIGHT",   // Next best side to avoid
+      (obstacleInFront_) ? "FRONT" : "0",  // FRONT if danger at the front
+      (obstacleInSide_) ? "AVOID" : "0"    // AVOID if danger at the side
     );
-    
+
+    // Select the next status in function of each weight
+    if (load_forward > conflict_penalty){
+      status_ = FORWARD;
+    }
+    if (load_avoiding > conflict_penalty){
+      status_ = AVOIDING;
+    }
+    if (load_relocating > conflict_penalty){
+      status_ = RELOCATING;
+    }
+    if (load_rotating > conflict_penalty){
+      status_ = ROTATING;
+    }
+
     switch (status_)
     {
 
     case FORWARD: 
+
+      // Reset the variables
       try_to_unlock_ = 0;
       lock_remaining_ = 0;
-      lastSideRotated_ = NULLSIDE;
+      lastSideRotated_ = NULLSIDE; // Forget the last side used (optimization)
+
+      // Move forward
       motion_.linear.set__x(velocity_);
       motion_.angular.set__z(0);
-      status_ = (obstacleInFront_) ? ROTATING : FORWARD;
+
+      // Stop when finding an obstacle
+      if (obstacleInFront_){
+
+          // Add the weights to change status
+          load_rotating++;
+          this->load_forward = 0;
+          this->load_relocating = 0;
+          this->load_avoiding = 0;
+      }
       break;
 
     case ROTATING:
@@ -104,23 +156,23 @@
       // Set velocity to 0
       motion_.linear.set__x(0);
 
-      // If you are switching between directions start growing a unlocker variable
+      // If you are switching between directions start growing the punishment effect 
       if (lastSideRotated_ != sideToAvoidObstacle_ && lastSideRotated_ != NULLSIDE){
         try_to_unlock_++;
         lock_remaining_ = try_to_unlock_;
       }
 
-      // If you are no locked, turn to the side scanned and save the direction 
+      // If you are not locked (because of punishment), turn to the side scanned and save the direction 
       if (lock_remaining_ == 0){
+
         if (sideToAvoidObstacle_ == LEFT)
         {
-
-          motion_.angular.set__z(velocity_);
+          motion_.angular.set__z(velocity_*rotation_speed);
           lastSideRotated_ = sideToAvoidObstacle_;
         }
         else if (sideToAvoidObstacle_ == RIGHT)
         {
-          motion_.angular.set__z(-velocity_);
+          motion_.angular.set__z(-velocity_*rotation_speed);
           lastSideRotated_ = sideToAvoidObstacle_;
         }
 
@@ -128,79 +180,127 @@
       } else {
         if (lastSideRotated_ == LEFT)
         {
-          motion_.angular.set__z(velocity_);
+          motion_.angular.set__z(velocity_*rotation_speed);
         }
         else if (lastSideRotated_ == RIGHT)
         {
-          motion_.angular.set__z(-velocity_);
+          motion_.angular.set__z(-velocity_*rotation_speed);
         }
-        // Decrease unlock variable
+        // Decrease punishment variable
         lock_remaining_--;
       }
 
-      // If you avoided the obstacle, change status
-      if (!obstacleInSide_ && !obstacleInDanger_) {
+      // If you avoided the obstacle, change status (add the weights)
+      if (!obstacleInSide_) {
+
+        // Start a timer for the next status
         end_time_ = rclcpp::Time(this->now() + std::chrono::seconds(seconds_rotating_));
-        status_ = AVOIDING;
+        this->load_avoiding++;
+        this->load_rotating = 0;
+        this->load_forward = 0;
+        this->load_relocating = 0;
+
       }
 
       // If you are in a narrow passage make a slow step 
-      if (obstacleInSide_ && !obstacleInFront_){
-        motion_.angular.set__z(0);
-        motion_.linear.set__x(velocity_/2);
-      }
+      // [WARNING] Mode Disabled. Working nice in simulator, although in reality
+      // narrow passages are dangerous 
+      //if (obstacleInSide_ && !obstacleInFront_){
+      //   motion_.angular.set__z(0);
+      //   motion_.linear.set__x(velocity_/2);
+      // }
 
       break;
 
     case AVOIDING:
 
+      // Start moving forward 
       motion_.linear.set__x(velocity_);
 
-      if (obstacleInFront_ || obstacleInDanger_) {
+      // If you find and obstacle, add weights to the turning status
+      if (obstacleInFront_ && obstacleInSide_) {
+        
+        // Reset other variables (optimization)
         try_to_unlock_ = 0;
         lock_remaining_ = 0;
         lastSideRotated_ = NULLSIDE;
-        status_ = ROTATING;
+
+        // Add weights
+        load_rotating++;
+        this->load_avoiding = 0;
+        this->load_forward = 0;
+        this->load_relocating = 0;
       }
 
+      // If you turned to one side, then avoid to the opposite
       if (sideToAvoidObstacle_ == LEFT){
         motion_.angular.set__z(-velocity_*rotation_smoothness_);
       }else{
         motion_.angular.set__z(velocity_*rotation_smoothness_);
       }
 
+      // If the avoidance finish
       if (this->now() > end_time_){
+
+        // Reset variables (optimization)
         try_to_unlock_ = 0;
         lock_remaining_ = 0;
         lastSideRotated_ = NULLSIDE;
+
+        // Start a timer (for next status)
         end_time_ = rclcpp::Time(this->now() + std::chrono::seconds(seconds_recolocating_));
         sideCompleted_ = sideToAvoidObstacle_;
+
+        // Reset the status and jump directly to the next status (without weight)
         status_ = RELOCATING;
+        this->load_relocating = 0;
+        this->load_forward = 0;
+        this->load_rotating = 0;
+        this->load_avoiding = 0;
+
       }
       break;
 
     case RELOCATING:
 
+      // Stop moving
       motion_.linear.set__x(0);
 
+      // Relocate to the opposite side of the avoidance
       if (sideCompleted_ == LEFT){
-        motion_.angular.set__z(velocity_);
+        motion_.angular.set__z(velocity_*rotation_speed);
       }else{
-        motion_.angular.set__z(-velocity_);
+        motion_.angular.set__z(-velocity_*rotation_speed);
       }
 
+      // If you finished relocating
       if (this->now() > end_time_){
+
+        // Restart the FSM
         status_ = FORWARD;
+        this->load_forward = 0;
+        this->load_relocating = 0;
+        this->load_rotating = 0;
+        this->load_avoiding = 0;
       }
       break;
     }
-    
+
+    // Publish the result of the FSM 
     publisher_->publish(motion_);
 
   }
 
   std::vector<bool> BaseController::sectorize(std::vector<float>& data, float sectors, float range){
     
+    // How does this work:
+    // For sectorizing a set of data only is needed to calculate the mean of the
+    // sum of the measurements taken from the laser. This will be repeated <resolution>
+    // times and will be comparted with the range variable to determine wheter the sector
+    // has a perturbance or not.
+    // This will return for example: [0 0 0 0 0 1 1 1 1 1 1 0 0 0 0 0 0 ...]xN 
+    // (note how the object are represented with 1's)
+
     std::vector<bool> vec;                      // Vector with sector in range status
     int valuesInVector = data.size()/sectors;   // Number of data measurements in each sector
     float sum;                                  // Sum of all measurements (per sector)
@@ -214,18 +314,20 @@
       sum = sum/valuesInVector;
 
       // Apend status of the sector
-      vec.push_back(sum <= range);
+      vec.push_back(sum <= range && sum >= 0.2);
+
+      // [Note] Use this logger to directly retreive the sectorization of each measurement
       // RCLCPP_INFO(get_logger(), (sum <= range) ? "1" : "0");    
     }    
-    // RCLCPP_INFO(get_logger(),"-------------------");    
-    // RCLCPP_INFO(get_logger(),"seconds: %d", seconds_rotating_);    
     return vec;
   }
 
   bool BaseController::obstacleAnalize(std::vector<bool>& status, int sensivity){
 
     // This will look search <sensivity/2> measurements next to
-    // the center of the vector
+    // the center of the vector. It will mark the sectors specified 
+    // according to the sensitivity of the system as those with greater
+    // relevance 
     // For example:
     // vector.size() = 9, sensivity = 3
     // - - - X X X - - - 
@@ -244,6 +346,9 @@
 
   BaseController::Direction BaseController::calculate_side_to_avoid_obstacle(std::vector<bool>& status){
 
+    // Analyse the given sectorization and iterate until you find the first free space
+    // going from the center (front) to the extremes of the vector
+    // By testing, it returns the best side to avoid in >80% of the cases
     bool obstacle_at_right = true;
     bool obstacle_at_left = true;
 
@@ -270,23 +375,30 @@
     return sideToAvoidObstacle_; 
   }
 
-  void BaseController::setIntensities(std::vector<bool>& frontal,std::vector<bool>& avoid,std::vector<bool>& danger){
+  void BaseController::setIntensities(std::vector<bool>& frontal,std::vector<bool>& avoid){
 
-      for (int i = 0; i < scan_resolution_; i++){
-        if (danger[i]){
-          intensities_[i] = 3;
-        }else if (avoid[i]){
-          intensities_[i] = 2;
-        }else if (frontal[i]){
-          intensities_[i] = 1;
-        }else{
-          intensities_[i] = 0;
-        }
+    // Asignes 0,1,2 to the satatuses of AVOID,FRONTAL,FREE (for graphication)
+    for (int i = 0; i < scan_resolution_; i++)
+    {
+      if (avoid[i])
+      {
+        intensities_[i] = 2;
       }
+      else if (frontal[i])
+      {
+        intensities_[i] = 1;
+      }
+      else
+      {
+        intensities_[i] = 0;
+      }
+    }
   }
 
   std::vector<float> BaseController::translate_kobuki_scan(std::vector<float> ranges){
 
+      // Remap the laser as the same order of a Tiago laser. This means
+      // starting at -1.91rad to 1.91 rad instead of 0rad to 6.4rad
       int center = ranges.size()/2;
       std::vector<float> newRanges;      
 
