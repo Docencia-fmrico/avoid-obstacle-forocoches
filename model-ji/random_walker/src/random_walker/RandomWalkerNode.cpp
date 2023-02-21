@@ -260,10 +260,9 @@ bool RandomWalkerNode::check_2_turn()
 
   int size = last_scan_->ranges.size();
   float reduced_threshold = 0.0f;
-  float min_threshold = 0.4f;
 
   // Check if the bumper has been triggered
-  if (last_bumper_detected_->state == last_bumper_detected_->PRESSED) {
+  if (last_bumper_detected_ != nullptr && last_bumper_detected_->state == last_bumper_detected_->PRESSED) {
     // Set rotation speed
     if (last_bumper_detected_->bumper == last_bumper_detected_->RIGHT) {
       speed_rotation_angular_ = -SPEED_TURN_ANGULAR;
@@ -276,9 +275,9 @@ bool RandomWalkerNode::check_2_turn()
   // Left range
   for (int i = 0; i < (size / 2); i++) {
     reduced_threshold = OBSTACLE_DISTANCE_THRESHOLD -
-      (OBSTACLE_DISTANCE_THRESHOLD - min_threshold) * i / (size / current_range);
-    if (reduced_threshold < min_threshold) {reduced_threshold = min_threshold;}
-    if (last_scan_->ranges[i] < reduced_threshold) {
+      (OBSTACLE_DISTANCE_THRESHOLD - MIN_THRESHOLD) * i / (size / current_range);
+    if (reduced_threshold < MIN_THRESHOLD) {reduced_threshold = MIN_THRESHOLD;}
+    if (last_scan_->ranges[i] < reduced_threshold && last_scan_->ranges[i] > NON_DETECTION_THRESHOLD) {
       obstacle_position_ = -1;  // Obstacle position in the left
       // Set rotation speed
       speed_rotation_angular_ = SPEED_TURN_ANGULAR * (1 - (static_cast<float>(i) / (size / 2)) / 2);
@@ -289,9 +288,9 @@ bool RandomWalkerNode::check_2_turn()
   // Right range
   for (int i = size - 1; i > (size - (size / 2)); i--) {
     reduced_threshold = OBSTACLE_DISTANCE_THRESHOLD -
-      (OBSTACLE_DISTANCE_THRESHOLD - min_threshold) * (size - i) / (size / current_range);
-    if (reduced_threshold < min_threshold) {reduced_threshold = min_threshold;}
-    if (last_scan_->ranges[i] < reduced_threshold) {
+      (OBSTACLE_DISTANCE_THRESHOLD - MIN_THRESHOLD) * (size - i) / (size / current_range);
+    if (reduced_threshold < MIN_THRESHOLD) {reduced_threshold = MIN_THRESHOLD;}
+    if (last_scan_->ranges[i] < reduced_threshold && last_scan_->ranges[i] > NON_DETECTION_THRESHOLD) {
       obstacle_position_ = 1;  // Obstacle position in the right
       // Set rotation speed
       speed_rotation_angular_ = -SPEED_TURN_ANGULAR *
@@ -326,7 +325,7 @@ void RandomWalkerNode::set_rotation_time(float speed)
 bool RandomWalkerNode::check_2_backward()
 {
   // This shold never happend under normal conditions
-  return last_bumper_detected_->state == last_bumper_detected_->PRESSED;
+  return last_bumper_detected_ != nullptr && last_bumper_detected_->state == last_bumper_detected_->PRESSED;
 }
 
 bool RandomWalkerNode::check_backward_2_turn()
