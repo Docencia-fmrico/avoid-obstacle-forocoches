@@ -27,6 +27,18 @@ RandomWalkerNode::RandomWalkerNode()
     "input_scan", rclcpp::SensorDataQoS(),
     std::bind(&RandomWalkerNode::scan_callback, this, _1));
 
+  button_sub_ = create_subscription<kobuki_ros_interfaces::msg::ButtonEvent>(
+    "input_button", 10,
+    std::bind(&RandomWalkerNode::button_callback, this, _1));
+
+  wheel_drop_sub_ = create_subscription<kobuki_ros_interfaces::msg::WheelDropEvent>(
+    "input_wheel_drop", 10,
+    std::bind(&RandomWalkerNode::wheel_drop_callback, this, _1));
+
+  bumper_sub_ = create_subscription<kobuki_ros_interfaces::msg::BumperEvent>(
+    "input_bumper", 10,
+    std::bind(&RandomWalkerNode::bumper_callback, this, _1));
+
   timer_ = create_wall_timer(
     100ms, std::bind(&RandomWalkerNode::control_cycle, this));
 
@@ -38,8 +50,6 @@ RandomWalkerNode::RandomWalkerNode()
   declare_parameter("SPEED_TURN_LINEAR", SPEED_TURN_LINEAR);
   declare_parameter("SPEED_TURN_ANGULAR", SPEED_TURN_ANGULAR);
   declare_parameter("OBSTACLE_DISTANCE_THRESHOLD", OBSTACLE_DISTANCE_THRESHOLD);
-  declare_parameter("SCAN_RANGE", SCAN_RANGE);
-
 
   // Retrieve parameters
   get_parameter("SPEED_STOP_LINEAR", SPEED_STOP_LINEAR);
@@ -49,7 +59,6 @@ RandomWalkerNode::RandomWalkerNode()
   get_parameter("SPEED_TURN_LINEAR", SPEED_TURN_LINEAR);
   get_parameter("SPEED_TURN_ANGULAR", SPEED_TURN_ANGULAR);
   get_parameter("OBSTACLE_DISTANCE_THRESHOLD", OBSTACLE_DISTANCE_THRESHOLD);
-  get_parameter("SCAN_RANGE", SCAN_RANGE);
 
   // Initialize the last state to stop
   last_state_ = STOP;
@@ -58,6 +67,29 @@ RandomWalkerNode::RandomWalkerNode()
 void RandomWalkerNode::scan_callback(sensor_msgs::msg::LaserScan::UniquePtr msg)
 {
   last_scan_ = std::move(msg);
+}
+
+void RandomWalkerNode::button_callback(kobuki_ros_interfaces::msg::ButtonEvent::UniquePtr msg)
+{
+  last_button_pressed_ = std::move(msg);
+  if (last_button_pressed_->button == kobuki_ros_interfaces::msg::ButtonEvent::BUTTON1 &&
+    last_button_pressed_->state == 1)
+  {
+    button_pressed_ = !button_pressed_;
+  }
+}
+
+void RandomWalkerNode::wheel_drop_callback(
+  kobuki_ros_interfaces::msg::WheelDropEvent::UniquePtr msg)
+{
+  last_wheel_dropped_ = std::move(msg);
+  // Not on the ground
+  kobuki_not_on_ground_ = last_wheel_dropped_->state == 0;
+}
+
+void RandomWalkerNode::bumper_callback(kobuki_ros_interfaces::msg::BumperEvent::UniquePtr msg)
+{
+  last_bumper_detected_ = std::move(msg);
 }
 
 void RandomWalkerNode::control_cycle()
@@ -73,9 +105,15 @@ void RandomWalkerNode::control_cycle()
   // FSM
   switch (state_) {
     case STOP:
-      debug_msg_.data = DebugNode::READY;
       out_vel_.linear.x = SPEED_STOP_LINEAR;
       out_vel_.angular.z = SPEED_STOP_ANGULAR;
+      if (stopped_with_error_) {
+        debug_msg_.data = DebugNode::ERROR;
+        if (kobuki_not_on_ground_) {debug_msg_.data = DebugNode::NOT_ON_GROUND;}
+      } else {
+        // Waiting for button press
+        debug_msg_.data = DebugNode::READY;
+      }
       // Can go to last state, if is null then go forward
       if (check_stop_2_last()) {
         // Check if we have an old state
@@ -99,6 +137,10 @@ void RandomWalkerNode::control_cycle()
       if (check_2_turn()) {
         change_state(TURN);
       }
+      // Extreme case, go backwards
+      if (check_2_backward()) {
+        change_state(BACKWARD);
+      }
       break;
     case TURN:
       out_vel_.linear.x = SPEED_TURN_LINEAR;
@@ -113,6 +155,10 @@ void RandomWalkerNode::control_cycle()
         } else {
           change_state(ROTATION);
         }
+      }
+      // Extreme case, go backwards
+      if (check_2_backward()) {
+        change_state(BACKWARD);
       }
       break;
     case ROTATION:
@@ -130,6 +176,31 @@ void RandomWalkerNode::control_cycle()
         change_state(TURN);
       }
       if (check_2_turn()) {
+        // Check if the turn happened faster then expected
+        if (check_rotation_2_turn_time()) {
+          // Lessen the laser range
+          current_range++;
+        } else {
+          // Make the laser range bigger
+          current_range--;
+          if (current_range < MIN_LASER_RANGE) {current_range = MIN_LASER_RANGE;}
+        }
+        change_state(TURN);
+      }
+      // Extreme case, go backwards
+      if (check_2_backward()) {
+        change_state(BACKWARD);
+      }
+      break;
+    case BACKWARD:
+      // Only used in cases where the laser cannot detect the object
+      out_vel_.linear.x = -SPEED_FORWARD_LINEAR;
+      out_vel_.angular.z = SPEED_FORWARD_ANGULAR;
+      // Can go to stop or to turn
+      if (check_2_stop()) {
+        change_state(STOP);
+      }
+      if (check_backward_2_turn()) {
         change_state(TURN);
       }
       break;
@@ -162,43 +233,69 @@ bool RandomWalkerNode::check_stop_2_last()
 {
   // Return if everything works as intended
   auto elapsed = now() - rclcpp::Time(last_scan_->header.stamp);
-  return elapsed < LASER_SCAN_TIMEOUT;
+  stopped_with_error_ = false;
+  return elapsed < LASER_SCAN_TIMEOUT && !kobuki_not_on_ground_ && button_pressed_;
 }
 
 bool RandomWalkerNode::check_2_stop()
 {
   // Stop if something is wrong
   auto elapsed = now() - rclcpp::Time(last_scan_->header.stamp);
-  return elapsed > LASER_SCAN_TIMEOUT;
+  stopped_with_error_ = elapsed > LASER_SCAN_TIMEOUT || kobuki_not_on_ground_;
+  return stopped_with_error_ || !button_pressed_;
 }
 
 bool RandomWalkerNode::check_turn_2_rotation()
 {
-  // Start rotation when it finishes turnig
+  // Start rotation when it finishes turning
   return (now() - state_timestamp_) > TURNING_TIME;
 }
 
 bool RandomWalkerNode::check_2_turn()
 {
+  // Always size/4 to -size/4 Min_threshold
+  // The rest is Min_threshold if i == size / current_range
+  // i == 0, always 1 meter
   // Turn if the laser detects an object near
+
   int size = last_scan_->ranges.size();
+  float reduced_threshold = 0.0f;
+  float min_threshold = 0.4f;
+
+  // Check if the bumper has been triggered
+  if (last_bumper_detected_->state == last_bumper_detected_->PRESSED) {
+    // Set rotation speed
+    if (last_bumper_detected_->bumper == last_bumper_detected_->RIGHT) {
+      speed_rotation_angular_ = -SPEED_TURN_ANGULAR;
+    } else {
+      speed_rotation_angular_ = SPEED_TURN_ANGULAR;
+    }
+    return true;
+  }
 
   // Left range
-  for (int i = 0; i < (size / SCAN_RANGE); i++) {
-    if (last_scan_->ranges[i] < OBSTACLE_DISTANCE_THRESHOLD) {
-      obstacle_position_ = - 1;  // Obstacle position in the left
+  for (int i = 0; i < (size / 2); i++) {
+    reduced_threshold = OBSTACLE_DISTANCE_THRESHOLD -
+      (OBSTACLE_DISTANCE_THRESHOLD - min_threshold) * i / (size / current_range);
+    if (reduced_threshold < min_threshold) {reduced_threshold = min_threshold;}
+    if (last_scan_->ranges[i] < reduced_threshold) {
+      obstacle_position_ = -1;  // Obstacle position in the left
       // Set rotation speed
-      speed_rotation_angular_ = SPEED_TURN_ANGULAR * (1 - (((float) i) / (size / SCAN_RANGE)) / 2);
+      speed_rotation_angular_ = SPEED_TURN_ANGULAR * (1 - (static_cast<float>(i) / (size / 2)) / 2);
       return true;
     }
   }
 
   // Right range
-  for (int i = size - 1; i > (size - (size / SCAN_RANGE)); i--) {
-    if (last_scan_->ranges[i] < OBSTACLE_DISTANCE_THRESHOLD) {
+  for (int i = size - 1; i > (size - (size / 2)); i--) {
+    reduced_threshold = OBSTACLE_DISTANCE_THRESHOLD -
+      (OBSTACLE_DISTANCE_THRESHOLD - min_threshold) * (size - i) / (size / current_range);
+    if (reduced_threshold < min_threshold) {reduced_threshold = min_threshold;}
+    if (last_scan_->ranges[i] < reduced_threshold) {
       obstacle_position_ = 1;  // Obstacle position in the right
       // Set rotation speed
-      speed_rotation_angular_ = - SPEED_TURN_ANGULAR * (1 - ((size - ((float) i)) / (size / SCAN_RANGE)) / 2);
+      speed_rotation_angular_ = -SPEED_TURN_ANGULAR *
+        (1 - ((size - static_cast<float>(i)) / (size / 2)) / 2);
       return true;
     }
   }
@@ -211,81 +308,10 @@ bool RandomWalkerNode::check_rotation_2_forward()
   return (now() - state_timestamp_) > ROTATING_TIME;
 }
 
-float RandomWalkerNode::set_rotation_speed()
+bool RandomWalkerNode::check_rotation_2_turn_time()
 {
-  // New method 
-  // lc = l0 * cos (alpha * index);
-  // c = l0 * sin (alpha * index);
-  // beta = atan2(l-lc, c);
-  // delta = atan2(c,lc)
-  // gamma = beta + delta;
-  // const gamma if it isn't object ended
-  // float alpha = last_scan_->angle_increment;  // in rads
-  float beta, delta, gamma;  // in rads
-  float lc, c; 
-  float precission = 0.2f;
-  int size = last_scan_->ranges.size();
-
-  if (obstacle_position_ == 1) {  // Object in right size
-    // See left range
-    // Get the first beta as reference
-    lc = last_scan_->ranges[0] * cos(1);
-    c = last_scan_->ranges[0] * sin(1);
-    beta = atan2(last_scan_->ranges[1] - lc, c);  // In rads
-    delta = atan2(c, lc);  // In rads
-    float ref_gamma = beta + delta;  // In rads
-
-    for (int i = 1; i < (size / SCAN_RANGE); i++) {
-      lc = last_scan_->ranges[0] * cos(i);
-      c = last_scan_->ranges[0] * sin(i);
-      beta = atan2(last_scan_->ranges[i] - lc, c);  // In rads
-      delta = atan2(c, lc);  // In rads
-      gamma = beta + delta;  // In rads
-      RCLCPP_INFO(get_logger(), "Check left size info : %d", i);
-      RCLCPP_INFO(get_logger(), "Check left size info : l0 = %f", last_scan_->ranges[0]);
-      RCLCPP_INFO(get_logger(), "Check left size info : %f of %f|%f|%f|%f",last_scan_->ranges[i] ,lc,c,beta,delta);
-      RCLCPP_INFO(get_logger(), "Check left size info : %f of %f", gamma, ref_gamma);
-      if ( !(ref_gamma + precission > gamma && ref_gamma - precission < gamma)) {
-          RCLCPP_INFO(get_logger(), "Check left size out : %d", i);
-          RCLCPP_INFO(get_logger(), "Check left size out : %f of %f", gamma, ref_gamma);
-          return - SPEED_TURN_ANGULAR * (1 - (((float) i) / (size / SCAN_RANGE)) / 2);
-      }
-
-    }
-    return - SPEED_TURN_ANGULAR / 2;
-
-  } else if (obstacle_position_ == - 1) {  // Object in left size
-    // See right range
-    // Get the first beta as reference
-    lc = last_scan_->ranges[0] * cos(size - 1);
-    c = - last_scan_->ranges[0] * sin(size - 1);
-    beta = atan2(last_scan_->ranges[(size -1)] - lc, c);  // In rads
-    delta = atan2(c, lc);  // In rads
-    float ref_gamma = beta + delta;  // In rads
-
-    for (int i = size - 1; i > (size - (size / SCAN_RANGE)); i--) {
-
-      lc = last_scan_->ranges[0] * cos(i);
-      c = - last_scan_->ranges[0] * sin(i);
-      beta = atan2(last_scan_->ranges[i] - lc, c);  // In rads
-      delta = atan2(c, lc);  // In rads
-      gamma = beta + delta;  // In rads
-
-      RCLCPP_INFO(get_logger(), "Check right size info : %d", i);
-      RCLCPP_INFO(get_logger(), "Check right size info : l0 = %f", last_scan_->ranges[0]);
-      RCLCPP_INFO(get_logger(), "Check right size info : %f of %f|%f|%f|%f",last_scan_->ranges[i] ,lc,c,beta,delta);
-      RCLCPP_INFO(get_logger(), "Check right size info : %f of %f", gamma, ref_gamma);
-
-      if ( !(ref_gamma + precission > gamma && ref_gamma - precission < gamma)) {
-          RCLCPP_INFO(get_logger(), "Check right size out : %d", i);
-          RCLCPP_INFO(get_logger(), "Check right size out : %f of %f", gamma, ref_gamma);
-          return SPEED_TURN_ANGULAR * (1 - ((size - ((float) i)) / (size / SCAN_RANGE)) / 2);
-      }
-
-    }
-    return SPEED_TURN_ANGULAR / 2;
-  }
-  return 0.0f;  // Something went wrong
+  // Go forward when it finishes rotating
+  return (now() - state_timestamp_) > MIN_ROTATING_TIME;
 }
 
 void RandomWalkerNode::set_rotation_time(float speed)
@@ -295,4 +321,16 @@ void RandomWalkerNode::set_rotation_time(float speed)
   }
   RCLCPP_INFO(get_logger(), "Set time: %f", (SPEED_TURN_ANGULAR / speed) * 12);
   rclcpp::Duration ROTATING_TIME {(SPEED_TURN_ANGULAR / speed) * 12s};
+}
+
+bool RandomWalkerNode::check_2_backward()
+{
+  // This shold never happend under normal conditions
+  return last_bumper_detected_->state == last_bumper_detected_->PRESSED;
+}
+
+bool RandomWalkerNode::check_backward_2_turn()
+{
+  // Start rotation when it finishes turning
+  return (now() - state_timestamp_) > BACKWARD_TIME;
 }
