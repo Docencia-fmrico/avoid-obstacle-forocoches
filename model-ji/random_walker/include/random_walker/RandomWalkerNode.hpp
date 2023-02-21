@@ -16,6 +16,9 @@
 #define RANDOM_WALKER__RANDOMWALKERNODE_HPP_
 
 #include "sensor_msgs/msg/laser_scan.hpp"
+#include "kobuki_ros_interfaces/msg/button_event.hpp"
+#include "kobuki_ros_interfaces/msg/bumper_event.hpp"
+#include "kobuki_ros_interfaces/msg/wheel_drop_event.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 #include "random_walker/DebugNode.hpp"
 
@@ -32,6 +35,9 @@ public:
 private:
   // Subscribtion callbacks
   void scan_callback(sensor_msgs::msg::LaserScan::UniquePtr msg);
+  void button_callback(kobuki_ros_interfaces::msg::ButtonEvent::UniquePtr msg);
+  void wheel_drop_callback(kobuki_ros_interfaces::msg::WheelDropEvent::UniquePtr msg);
+  void bumper_callback(kobuki_ros_interfaces::msg::BumperEvent::UniquePtr msg);
 
   // Control cycle
   void control_cycle();
@@ -42,10 +48,16 @@ private:
 
   // Subscription
   rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
+  rclcpp::Subscription<kobuki_ros_interfaces::msg::ButtonEvent>::SharedPtr button_sub_;
+  rclcpp::Subscription<kobuki_ros_interfaces::msg::WheelDropEvent>::SharedPtr wheel_drop_sub_;
+  rclcpp::Subscription<kobuki_ros_interfaces::msg::BumperEvent>::SharedPtr bumper_sub_;
 
   // Message
   geometry_msgs::msg::Twist out_vel_;
   sensor_msgs::msg::LaserScan::UniquePtr last_scan_;
+  kobuki_ros_interfaces::msg::ButtonEvent::UniquePtr last_button_pressed_;
+  kobuki_ros_interfaces::msg::WheelDropEvent::UniquePtr last_wheel_dropped_;
+  kobuki_ros_interfaces::msg::BumperEvent::UniquePtr last_bumper_detected_;
   DebugNode::DebugMessage debug_msg_;
 
   // Timer
@@ -56,12 +68,17 @@ private:
   int state_;
   int last_state_;
   bool finished_rotation_;
+  bool stopped_with_error_ = false;
+  bool button_pressed_ = false;
+  bool kobuki_not_on_ground_ = false;
   rclcpp::Time state_timestamp_;
   // FSM states
   static const int STOP = 0;
   static const int FORWARD = 1;
   static const int TURN = 2;
   static const int ROTATION = 3;
+  // Only used in extreme conditions
+  static const int BACKWARD = 4;
   // FSM changes
   /**
    * @brief Change the state
@@ -100,15 +117,28 @@ private:
    */
   bool check_rotation_2_forward();
   /**
-   * @brief Placeholder
-   * @return float 
+   * @brief Checks if the turn has been triggered fast
+   * @return true
+   * @return false
    */
-  float set_rotation_speed();
+  bool check_rotation_2_turn_time();
   /**
    * @brief Set the rotation time
    * @param speed: rotation speed
    */
   void set_rotation_time(float speed);
+  /**
+   * @brief Check if the bumper has detected an object
+   * @return true
+   * @return false
+   */
+  bool check_2_backward();
+  /**
+   * @brief Checks if the backwards movement has ended
+   * @return true
+   * @return false
+   */
+  bool check_backward_2_turn();
 
   // Velocity control
   float SPEED_STOP_LINEAR = 0.0f;
@@ -119,11 +149,14 @@ private:
   float SPEED_TURN_ANGULAR = 0.3f;
   float speed_rotation_angular_ = 0.0f;
   const rclcpp::Duration TURNING_TIME {6s};
+  const rclcpp::Duration MIN_ROTATING_TIME {1s};
   rclcpp::Duration ROTATING_TIME {12s};
+  const rclcpp::Duration BACKWARD_TIME {1s};
 
   // Laser control
   float OBSTACLE_DISTANCE_THRESHOLD = 1.0f;
-  int SCAN_RANGE = 10;  // Higher = Less vission
+  int MIN_LASER_RANGE = 4;  // Half of the range
+  int current_range = MIN_LASER_RANGE;  // Higher = less range
   int obstacle_position_ = 0;  // -1 Left / 1 Right
   const rclcpp::Duration LASER_SCAN_TIMEOUT {1s};
 };

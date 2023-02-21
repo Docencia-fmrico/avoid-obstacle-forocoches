@@ -28,12 +28,15 @@ def generate_launch_description():
                             executable='wanderer',
                             output='screen',
                             parameters=[{
-                              'use_sim_time': True
+                              'use_sim_time': False
                             }, param_file],
                             arguments=['--ros-args', '--log-level', 'info'],
                             remappings=[
                               ('input_scan', '/scan'),
                               ('output_vel', '/cmd_vel'),
+                              ('input_button', '/events/button'),
+                              ('input_wheel_drop', '/events/wheel_drop'),
+                              ('input_bumper', '/events/bumper'),
                               ('output_led_1', '/commands/led1'),
                               ('output_led_2', '/commands/led2'),
                               ('output_sound', '/commands/sound')
