@@ -1,4 +1,4 @@
-rand_walker_node:
+avoid_obstacle_node:
   ros__parameters:
     SPEED_STOP_LINEAR: 0.0f
     SPEED_STOP_ANGULAR: 0.0f
@@ -7,3 +7,18 @@ rand_walker_node:
     SPEED_TURN_LINEAR: 0.0f
     SPEED_TURN_ANGULAR: 0.3f
     OBSTACLE_DISTANCE_THRESHOLD: 1.0f
+
+avoid_obstacle_advanced:
+  ros__parameters:
+    VELOCITY_: 0.2
+    ROTATION_SMOOTHNESS_: 2.3
+    RECOLOCATION_DELAY_: 22.0
+    RADIOUS_: 0.9
+    VELOCITY_DELAY_: 1.5
+    SCAN_RESOLUTION_: 131
+    FRONTAL_RANGE_: 1.0
+    AVOIDING_RANGE_: 0.5
+    FRONTAL_RESOLUTION_: 51
+    LATERAL_RESOLUTION_: 61
+    IS_KOBUKI: true
+    ROTATION_SPEED: 3.0

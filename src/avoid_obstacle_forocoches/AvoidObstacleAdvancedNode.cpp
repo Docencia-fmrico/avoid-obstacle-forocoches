@@ -14,28 +14,43 @@
 #include "avoid_obstacle_forocoches/AvoidObstacleAdvancedNode.hpp"
 
 AvoidObstacleAdvancedNode::AvoidObstacleAdvancedNode()
-: Node("base_controller")
+: Node("avoid_obstacle_advanced")
 {
+
   // Setting parameters
   // TODO: Set this set of parameters as declare-param, get_param() + intialize
   // directly with this values at the launcher
-  this->AVOID_SIDE_BY_DEFAULT_ = RIGHT;
-  this->velocity_ = 0.2;
-  this->rotation_smoothness_ = 2.3;
-  this->recolocation_delay_ = 22;
-  this->seconds_recolocating_ = velocity_ * recolocation_delay_;
-  this->radious_ = 0.9;
-  this->velocity_delay_ = 1.5;
-  this->seconds_rotating_ = (M_PI * radious_) / (velocity_ * velocity_delay_);
-  this->scan_resolution_ = 131;
-  this->frontal_range_ = 1;
-  this->avoiding_range_ = 0.5;
-  this->frontal_resolution_ = 51;
-  this->lateral_resolution_ = 61;
-  this->isKobuki = true;
-  this->rotation_speed = 3;
+  declare_parameter("VELOCITY_", velocity_);
+  declare_parameter("ROTATION_SMOOTHNESS_", rotation_smoothness_);
+  declare_parameter("RECOLOCATION_DELAY_", recolocation_delay_);
+  declare_parameter("RADIOUS_", radious_);
+  declare_parameter("VELOCITY_DELAY_", velocity_delay_);
+  declare_parameter("SCAN_RESOLUTION_", scan_resolution_);
+  declare_parameter("FRONTAL_RANGE_", frontal_range_);
+  declare_parameter("AVOIDING_RANGE_", avoiding_range_);
+  declare_parameter("FRONTAL_RESOLUTION_", frontal_resolution_);
+  declare_parameter("LATERAL_RESOLUTION_", lateral_resolution_);
+  declare_parameter("ISKOBUKI", isKobuki);
+  declare_parameter("ROTATION_SPEED", rotation_speed);
+
+  get_parameter("VELOCITY_", velocity_);
+  get_parameter("ROTATION_SMOOTHNESS_", rotation_smoothness_);
+  get_parameter("RECOLOCATION_DELAY_", recolocation_delay_);
+  get_parameter("RADIOUS_", radious_);
+  get_parameter("VELOCITY_DELAY_", velocity_delay_);
+  get_parameter("SCAN_RESOLUTION_", scan_resolution_);
+  get_parameter("FRONTAL_RANGE_", frontal_range_);
+  get_parameter("AVOIDING_RANGE_", avoiding_range_);
+  get_parameter("FRONTAL_RESOLUTION_", frontal_resolution_);
+  get_parameter("LATERAL_RESOLUTION_", lateral_resolution_);
+  get_parameter("IS_KOBUKI", isKobuki);
+  get_parameter("ROTATION_SPEED", rotation_speed);
+
 
   // Note this parameters should be initialized here
+  this->AVOID_SIDE_BY_DEFAULT_ = RIGHT;
+  this->seconds_recolocating_ = velocity_ * recolocation_delay_;
+  this->seconds_rotating_ = (M_PI * radious_) / (velocity_ * velocity_delay_);
   this->load_forward = 130;
   this->load_rotating = 0;
   this->load_relocating = 0;
@@ -56,7 +71,7 @@ AvoidObstacleAdvancedNode::AvoidObstacleAdvancedNode()
     10ms, std::bind(&AvoidObstacleAdvancedNode::timer_callback, this));
 
   // Building Publisher to graphicate to rviz
-  publisherRadar_ = create_publisher<sensor_msgs::msg::LaserScan>("my_radar", 10);
+  publisherRadar_ = create_publisher<sensor_msgs::msg::LaserScan>("radar_graph", 10);
   timerRadar_ = create_wall_timer(
     10ms, std::bind(&AvoidObstacleAdvancedNode::timer_callback_radar, this));
 }
@@ -118,7 +133,7 @@ void AvoidObstacleAdvancedNode::timer_callback()
   // Simple logger of the FSM
   // TODO: Replace this logger with a debug node (if reliable)
   RCLCPP_INFO(
-    get_logger(), "[%d,%d,%d,%d] Locker: %d. %s [%s,%s]",
+    get_logger(), "[%d,%d,%d,%d] Locker: %d. %s [%s,%s,%d]",
     load_forward,                                      // Weight of the status 1
     load_rotating,                                     // Weight of the status 2
     load_avoiding,                                     // Weight of the status 3
@@ -126,7 +141,8 @@ void AvoidObstacleAdvancedNode::timer_callback()
     lock_remaining_,                                   // Punishment aplplied for direction hesitation (at the time)
     (sideToAvoidObstacle_ == LEFT) ? "LEFT" : "RIGHT", // Next best side to avoid
     (obstacleInFront_) ? "FRONT" : "0",                // FRONT if danger at the front
-    (obstacleInSide_) ? "AVOID" : "0"                  // AVOID if danger at the side
+    (obstacleInSide_) ? "AVOID" : "0",                  // AVOID if danger at the side
+    lateral_resolution_
   );
 
   // Select the next status in function of each weight

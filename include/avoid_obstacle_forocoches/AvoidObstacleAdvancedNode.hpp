@@ -129,7 +129,7 @@ private:
   Direction sideToAvoidObstacle_ = RIGHT; // Direction where the robot should avoid
   Direction sideCompleted_;               // True if the avoid has been completed
   Direction lastSideRotated_ = NULLSIDE;  // Direction of the last avoid command
-  Direction AVOID_SIDE_BY_DEFAULT_;       // Avoid to a side by default (Deactivated by defect)
+  Direction AVOID_SIDE_BY_DEFAULT_ = RIGHT;       // Avoid to a side by default (Deactivated by defect)
   rclcpp::Time end_time_;                 // Maximum time until the command should end
   int try_to_unlock_;                     // Maximum current weight punishable
   int lock_remaining_;                    // Weight for punishing direction hesitation

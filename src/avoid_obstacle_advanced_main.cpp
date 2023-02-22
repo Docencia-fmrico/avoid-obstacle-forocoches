@@ -20,14 +20,10 @@ int main(int argc, char * argv[])
   rclcpp::init(argc, argv);
 
   auto mov_node = std::make_shared<AvoidObstacleAdvancedNode>();
-//  auto debug_node = std::make_shared<DebugNode>();
 
   rclcpp::executors::SingleThreadedExecutor executor;
-  // rclcpp::executors::MultiThreadedExecutor executor(
-  // rclcpp::executor::ExecutorArgs(), 8);
 
   executor.add_node(mov_node);
-//  executor.add_node(debug_node);
 
   executor.spin();
 
