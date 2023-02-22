@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include "avoid_obstacle_forocoches/AvoidObstacleAdvancedNode.hpp"
-#include "avoid_obstacle_forocoches/DebugNode.hpp"
 #include "rclcpp/rclcpp.hpp"
 
 int main(int argc, char * argv[])
@@ -21,14 +20,14 @@ int main(int argc, char * argv[])
   rclcpp::init(argc, argv);
 
   auto mov_node = std::make_shared<AvoidObstacleAdvancedNode>();
-  auto debug_node = std::make_shared<DebugNode>();
+//  auto debug_node = std::make_shared<DebugNode>();
 
   rclcpp::executors::SingleThreadedExecutor executor;
   // rclcpp::executors::MultiThreadedExecutor executor(
-  //   rclcpp::executor::ExecutorArgs(), 8);
+  // rclcpp::executor::ExecutorArgs(), 8);
 
   executor.add_node(mov_node);
-  executor.add_node(debug_node);
+//  executor.add_node(debug_node);
 
   executor.spin();
 
