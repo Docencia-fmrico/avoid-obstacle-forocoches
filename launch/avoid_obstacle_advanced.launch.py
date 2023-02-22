@@ -21,8 +21,8 @@ from launch_ros.actions import Node
 def generate_launch_description():
 
     # TODO: Add file
-    pkg_dir = get_package_share_directory('avoid_obstacle_forocoches')
-    param_file = os.path.join(pkg_dir, 'config', 'params.yaml')
+    # pkg_dir = get_package_share_directory('avoid_obstacle_forocoches')
+    # param_file = os.path.join(pkg_dir, 'config', 'params.yaml')
 
     avoid_obstacle_advanced_cmd = Node(
                                       package='avoid_obstacle_forocoches',
@@ -33,11 +33,8 @@ def generate_launch_description():
                                       }],
                                       arguments=['--ros-args', '--log-level', 'info'],
                                       remappings=[
-                                        ('input_scan', '/scan'),
-                                        ('output_vel', '/cmd_vel'),
-                                        ('output_led_1', '/commands/led1'),
-                                        ('output_led_2', '/commands/led2'),
-                                        ('output_sound', '/commands/sound')
+                                        ('input_scan', 'scan'),
+                                        ('output_vel', 'cmd_vel')
                                       ])
 
     ld = LaunchDescription()
