@@ -21,6 +21,7 @@ AvoidObstacleNode::AvoidObstacleNode()
 : Node("avoid_obstacle_node")
 {
   vel_pub_ = create_publisher<geometry_msgs::msg::Twist>("output_vel", 10);
+  marker_pub_ = create_publisher<visualization_msgs::msg::MarkerArray>("laser_marker", 1);
   debug_pub_ = create_publisher<DebugNode::DebugMessage>(DebugNode::TOPIC_NAME, 10);
 
   scan_sub_ = create_subscription<sensor_msgs::msg::LaserScan>(
@@ -102,6 +103,7 @@ void AvoidObstacleNode::control_cycle()
   }
 
   debug_msg_.data = DebugNode::OK;
+  print_markers();
   // FSM
   switch (state_) {
     case STOP:
@@ -216,6 +218,7 @@ void AvoidObstacleNode::control_cycle()
   }
 
   // Publish data
+  marker_pub_->publish(marker_msg_);
   vel_pub_->publish(out_vel_);
   debug_pub_->publish(debug_msg_);
 }
@@ -259,7 +262,11 @@ bool AvoidObstacleNode::check_2_turn()
   // Turn if the laser detects an object near
 
   int size = last_scan_->ranges.size();
-  float reduced_threshold = 0.0f;
+  reduced_threshold_ = 0.0f;
+  reduced_non_detection_threshold_ = MIN_THRESHOLD - 0.03f * (current_range / 5);
+  if (reduced_non_detection_threshold_ <= NON_DETECTION_THRESHOLD) {
+    reduced_non_detection_threshold_ = NON_DETECTION_THRESHOLD + 0.01f;
+  }
 
   // Check if the bumper has been triggered
   if (last_bumper_detected_ != nullptr &&
@@ -278,10 +285,14 @@ bool AvoidObstacleNode::check_2_turn()
 
   // Left range
   for (int i = 0; i < (size / 2); i++) {
-    reduced_threshold = OBSTACLE_DISTANCE_THRESHOLD -
-      (OBSTACLE_DISTANCE_THRESHOLD - MIN_THRESHOLD) * i / (size / current_range);
-    if (reduced_threshold < MIN_THRESHOLD) {reduced_threshold = MIN_THRESHOLD;}
-    if (last_scan_->ranges[i] < reduced_threshold &&
+    reduced_threshold_ = OBSTACLE_DISTANCE_THRESHOLD -
+      (OBSTACLE_DISTANCE_THRESHOLD - reduced_non_detection_threshold_) *
+      i / (size / current_range);
+
+    if (reduced_threshold_ < reduced_non_detection_threshold_) {
+      reduced_threshold_ = reduced_non_detection_threshold_;
+    }
+    if (last_scan_->ranges[i] < reduced_threshold_ &&
       last_scan_->ranges[i] > NON_DETECTION_THRESHOLD)
     {
       obstacle_position_ = -1;  // Obstacle position in the left
@@ -293,16 +304,22 @@ bool AvoidObstacleNode::check_2_turn()
 
   // Right range
   for (int i = size - 1; i > (size - (size / 2)); i--) {
-    reduced_threshold = OBSTACLE_DISTANCE_THRESHOLD -
-      (OBSTACLE_DISTANCE_THRESHOLD - MIN_THRESHOLD) * (size - i) / (size / current_range);
-    if (reduced_threshold < MIN_THRESHOLD) {reduced_threshold = MIN_THRESHOLD;}
-    if (last_scan_->ranges[i] < reduced_threshold &&
+    reduced_threshold_ = OBSTACLE_DISTANCE_THRESHOLD -
+      (OBSTACLE_DISTANCE_THRESHOLD - reduced_non_detection_threshold_) *
+      (size - i) / (size / current_range);
+
+    if (reduced_threshold_ < reduced_non_detection_threshold_) {
+      reduced_threshold_ = reduced_non_detection_threshold_;
+    }
+    if (last_scan_->ranges[i] < reduced_threshold_ &&
       last_scan_->ranges[i] > NON_DETECTION_THRESHOLD)
     {
       obstacle_position_ = 1;  // Obstacle position in the right
       // Set rotation speed
       speed_rotation_angular_ = -SPEED_TURN_ANGULAR *
         (1 - ((size - static_cast<float>(i)) / (size / 2)) / 2);
+      marker_msg_.markers[i].color.b = 0.0f;
+      marker_msg_.markers[i].lifetime = rclcpp::Duration(5s);
       return true;
     }
   }
@@ -353,4 +370,69 @@ bool AvoidObstacleNode::check_backward_2_turn()
 {
   // Start rotation when it finishes turning
   return (now() - state_timestamp_) > BACKWARD_TIME;
+}
+
+void AvoidObstacleNode::print_markers(){
+  int size = last_scan_->ranges.size();
+  float alpha = last_scan_->angle_increment;
+
+  marker_msg_.markers.clear();
+  for (int i = 0; i < size; i++) {
+    if (i < size / 2) {
+      reduced_threshold_ = OBSTACLE_DISTANCE_THRESHOLD -
+        (OBSTACLE_DISTANCE_THRESHOLD - reduced_non_detection_threshold_) * i / (size / current_range);
+    } else {
+      reduced_threshold_ = OBSTACLE_DISTANCE_THRESHOLD -
+        (OBSTACLE_DISTANCE_THRESHOLD - reduced_non_detection_threshold_) * (size - i) / (size / current_range);
+    }
+    if (reduced_threshold_ < reduced_non_detection_threshold_) {reduced_threshold_ = reduced_non_detection_threshold_;}
+    // Publish and create the markers
+    // First for detection
+    marker_msg_.markers.push_back(set_marker(alpha * i, reduced_threshold_, i));
+    // Second for range
+    visualization_msgs::msg::Marker range_marker = set_marker(alpha * i, OBSTACLE_DISTANCE_THRESHOLD, i + size);
+    range_marker.color.r = 0.0f;
+    marker_msg_.markers.push_back(range_marker);
+    // Third for min range
+    visualization_msgs::msg::Marker min_range_marker = set_marker(alpha * i, NON_DETECTION_THRESHOLD, i + size * 2);
+    min_range_marker.color.r = 0.0f;
+    marker_msg_.markers.push_back(min_range_marker);
+  }
+}
+
+visualization_msgs::msg::Marker AvoidObstacleNode::set_marker(float alpha, float distance, int id)
+{
+  // Set the markers for rviz
+  visualization_msgs::msg::Marker marker;
+  marker.header.frame_id = "base_link";
+  marker.header.stamp = now();
+
+  marker.type = visualization_msgs::msg::Marker::CUBE;
+  marker.action = visualization_msgs::msg::Marker::ADD;
+  marker.lifetime = rclcpp::Duration(100ms);
+  marker.id = id;
+
+  // Get x and y coordinates from alpha and distance
+  double x = cos(alpha) * distance;
+  double y = sin(alpha) * distance;
+
+  marker.pose.position.x = x;
+  marker.pose.position.y = y;
+  marker.pose.position.z = 1;
+
+  marker.pose.orientation.x = 0.0;
+  marker.pose.orientation.y = 0.0;
+  marker.pose.orientation.z = 0.0;
+  marker.pose.orientation.w = 1.0;
+
+  marker.scale.x = 0.02;
+  marker.scale.y = 0.02;
+  marker.scale.z = 0.02;
+
+  marker.color.r = 1.0;
+  marker.color.g = 1.0;
+  marker.color.b = 1.0;
+  marker.color.a = 1.0; // Don't forget to set the alpha!
+
+  return marker;
 }

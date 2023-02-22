@@ -20,6 +20,8 @@
 #include "kobuki_ros_interfaces/msg/bumper_event.hpp"
 #include "kobuki_ros_interfaces/msg/wheel_drop_event.hpp"
 #include "geometry_msgs/msg/twist.hpp"
+#include "visualization_msgs/msg/marker.hpp"
+#include "visualization_msgs/msg/marker_array.hpp"
 #include "avoid_obstacle_forocoches/DebugNode.hpp"
 
 #include "rclcpp/rclcpp.hpp"
@@ -44,6 +46,7 @@ private:
 
   // Publisher
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr vel_pub_;
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr marker_pub_;
   DebugNode::DebugPublisher debug_pub_;
 
   // Subscription
@@ -58,6 +61,7 @@ private:
   kobuki_ros_interfaces::msg::ButtonEvent::UniquePtr last_button_pressed_;
   kobuki_ros_interfaces::msg::WheelDropEvent::UniquePtr last_wheel_dropped_;
   kobuki_ros_interfaces::msg::BumperEvent::UniquePtr last_bumper_detected_;
+  visualization_msgs::msg::MarkerArray marker_msg_;
   DebugNode::DebugMessage debug_msg_;
 
   // Timer
@@ -157,10 +161,16 @@ private:
   float OBSTACLE_DISTANCE_THRESHOLD;
   int MIN_LASER_RANGE = 4;  // Half of the range
   float MIN_THRESHOLD = 0.4f;
-  float NON_DETECTION_THRESHOLD = 0.3f;
+  float reduced_threshold_ = 0.0f;
+  float NON_DETECTION_THRESHOLD = 0.25f;
+  float reduced_non_detection_threshold_ = 0.25f;
   int current_range = MIN_LASER_RANGE;  // Higher = less range
   int obstacle_position_ = 0;  // -1 Left / 1 Right
   const rclcpp::Duration LASER_SCAN_TIMEOUT {1s};
+
+  // Rviz control
+  void print_markers();
+  visualization_msgs::msg::Marker set_marker(float alpha, float distance, int id);
 };
 
 #endif  // AVOID_OBSTACLE_FOROCOCHES__AVOIDOBSTACLENODE_HPP_

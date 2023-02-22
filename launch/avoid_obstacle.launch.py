@@ -28,7 +28,7 @@ def generate_launch_description():
                               executable='avoid_obstacle',
                               output='screen',
                               parameters=[{
-                                'use_sim_time': False
+                                'use_sim_time': True
                               }, param_file],
                               arguments=['--ros-args', '--log-level', 'debug'],
                               remappings=[
