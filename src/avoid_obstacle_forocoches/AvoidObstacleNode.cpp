@@ -73,10 +73,16 @@ void AvoidObstacleNode::scan_callback(sensor_msgs::msg::LaserScan::UniquePtr msg
 void AvoidObstacleNode::button_callback(kobuki_ros_interfaces::msg::ButtonEvent::UniquePtr msg)
 {
   last_button_pressed_ = std::move(msg);
-  if (last_button_pressed_->button == kobuki_ros_interfaces::msg::ButtonEvent::BUTTON1 &&
-    last_button_pressed_->state == 1)
+  if (last_button_pressed_->state == kobuki_ros_interfaces::msg::ButtonEvent::PRESSED)
   {
-    button_pressed_ = !button_pressed_;
+    if (last_button_pressed_->button == kobuki_ros_interfaces::msg::ButtonEvent::BUTTON1)
+    {
+      button_pressed_ = !button_pressed_;
+    } else if (last_button_pressed_->button == kobuki_ros_interfaces::msg::ButtonEvent::BUTTON2 &&
+      !button_pressed_) {
+      last_state_ = STOP;
+    }
+    
   }
 }
 
