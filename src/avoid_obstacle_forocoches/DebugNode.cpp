@@ -62,33 +62,33 @@ void DebugNode::control_cycle()
     case OFF:
       set_led1_value(LED_OFF);
       set_led2_value(LED_OFF);
-      RCLCPP_INFO(get_logger(), "OFF");
+      RCLCPP_DEBUG(get_logger(), "OFF");
       debug_is_enabled = false;
       break;
     case OK:
       set_led1_value(LED_GREEN);
       set_led2_value(LED_GREEN);
-      RCLCPP_INFO(get_logger(), "OK");
+      RCLCPP_DEBUG(get_logger(), "OK");
       break;
     case READY:
       set_led1_value(LED_GREEN, FLASHING);
       set_led2_value(LED_GREEN, FLASHING);
-      RCLCPP_INFO(get_logger(), "READY");
+      RCLCPP_DEBUG(get_logger(), "READY");
       break;
     case NOT_ON_GROUND:
       set_led1_value(LED_RED);
       set_led2_value(LED_RED);
       set_sound(SOUND_ERROR);
-      RCLCPP_INFO(get_logger(), "NOT ON GROUND");
+      RCLCPP_DEBUG(get_logger(), "NOT ON GROUND");
       break;
     case ERROR:
       set_led1_value(LED_RED, FLASHING);
       set_led2_value(LED_RED, FLASHING);
       set_sound(SOUND_ERROR);
-      RCLCPP_INFO(get_logger(), "ERROR");
+      RCLCPP_DEBUG(get_logger(), "ERROR");
       break;
     default:
-      RCLCPP_INFO(get_logger(), "NOT DEFINED");
+      RCLCPP_DEBUG(get_logger(), "NOT DEFINED");
   }
 
   // Publish to the leds
