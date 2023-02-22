@@ -30,7 +30,7 @@ def generate_launch_description():
                               parameters=[{
                                 'use_sim_time': False
                               }, param_file],
-                              arguments=['--ros-args', '--log-level', 'info'],
+                              arguments=['--ros-args', '--log-level', 'debug'],
                               remappings=[
                                 ('input_scan', '/scan'),
                                 ('output_vel', '/cmd_vel'),

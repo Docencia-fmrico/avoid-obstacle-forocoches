@@ -141,12 +141,12 @@ private:
   bool check_backward_2_turn();
 
   // Velocity control
-  float SPEED_STOP_LINEAR = 0.0f;
-  float SPEED_STOP_ANGULAR = 0.0f;
-  float SPEED_FORWARD_LINEAR = 0.3f;
-  float SPEED_FORWARD_ANGULAR = 0.0f;
-  float SPEED_TURN_LINEAR = 0.0f;
-  float SPEED_TURN_ANGULAR = 0.3f;
+  float SPEED_STOP_LINEAR;
+  float SPEED_STOP_ANGULAR;
+  float SPEED_FORWARD_LINEAR;
+  float SPEED_FORWARD_ANGULAR;
+  float SPEED_TURN_LINEAR;
+  float SPEED_TURN_ANGULAR;
   float speed_rotation_angular_ = 0.0f;
   const rclcpp::Duration TURNING_TIME {6s};
   const rclcpp::Duration MIN_ROTATING_TIME {1s};
@@ -154,7 +154,7 @@ private:
   const rclcpp::Duration BACKWARD_TIME {1s};
 
   // Laser control
-  float OBSTACLE_DISTANCE_THRESHOLD = 1.0f;
+  float OBSTACLE_DISTANCE_THRESHOLD;
   int MIN_LASER_RANGE = 4;  // Half of the range
   float MIN_THRESHOLD = 0.4f;
   float NON_DETECTION_THRESHOLD = 0.3f;

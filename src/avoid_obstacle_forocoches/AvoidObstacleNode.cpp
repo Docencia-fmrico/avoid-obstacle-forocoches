@@ -43,13 +43,13 @@ AvoidObstacleNode::AvoidObstacleNode()
     100ms, std::bind(&AvoidObstacleNode::control_cycle, this));
 
   // Declare parameter
-  declare_parameter("SPEED_STOP_LINEAR", SPEED_STOP_LINEAR);
-  declare_parameter("SPEED_STOP_ANGULAR", SPEED_STOP_ANGULAR);
-  declare_parameter("SPEED_FORWARD_LINEAR", SPEED_FORWARD_LINEAR);
-  declare_parameter("SPEED_FORWARD_ANGULAR", SPEED_FORWARD_ANGULAR);
-  declare_parameter("SPEED_TURN_LINEAR", SPEED_TURN_LINEAR);
-  declare_parameter("SPEED_TURN_ANGULAR", SPEED_TURN_ANGULAR);
-  declare_parameter("OBSTACLE_DISTANCE_THRESHOLD", OBSTACLE_DISTANCE_THRESHOLD);
+  declare_parameter("SPEED_STOP_LINEAR", 0.0f);
+  declare_parameter("SPEED_STOP_ANGULAR", 0.0f);
+  declare_parameter("SPEED_FORWARD_LINEAR", 0.3f);
+  declare_parameter("SPEED_FORWARD_ANGULAR", 0.0f);
+  declare_parameter("SPEED_TURN_LINEAR", 0.0f);
+  declare_parameter("SPEED_TURN_ANGULAR", 0.4f);
+  declare_parameter("OBSTACLE_DISTANCE_THRESHOLD", 1.0f);
 
   // Retrieve parameters
   get_parameter("SPEED_STOP_LINEAR", SPEED_STOP_LINEAR);
@@ -84,7 +84,7 @@ void AvoidObstacleNode::wheel_drop_callback(
 {
   last_wheel_dropped_ = std::move(msg);
   // Not on the ground
-  kobuki_not_on_ground_ = last_wheel_dropped_->state == 0;
+  kobuki_not_on_ground_ = last_wheel_dropped_->state == kobuki_ros_interfaces::msg::WheelDropEvent::DROPPED;
 }
 
 void AvoidObstacleNode::bumper_callback(kobuki_ros_interfaces::msg::BumperEvent::UniquePtr msg)
@@ -108,8 +108,8 @@ void AvoidObstacleNode::control_cycle()
       out_vel_.linear.x = SPEED_STOP_LINEAR;
       out_vel_.angular.z = SPEED_STOP_ANGULAR;
       if (stopped_with_error_) {
-        debug_msg_.data = DebugNode::ERROR;
         if (kobuki_not_on_ground_) {debug_msg_.data = DebugNode::NOT_ON_GROUND;}
+        else {debug_msg_.data = DebugNode::ERROR;}
       } else {
         // Waiting for button press
         debug_msg_.data = DebugNode::READY;
@@ -233,8 +233,8 @@ bool AvoidObstacleNode::check_stop_2_last()
 {
   // Return if everything works as intended
   auto elapsed = now() - rclcpp::Time(last_scan_->header.stamp);
-  stopped_with_error_ = false;
-  return elapsed < LASER_SCAN_TIMEOUT && !kobuki_not_on_ground_ && button_pressed_;
+  stopped_with_error_ = elapsed > LASER_SCAN_TIMEOUT || kobuki_not_on_ground_;
+  return !stopped_with_error_ && button_pressed_;
 }
 
 bool AvoidObstacleNode::check_2_stop()
@@ -267,8 +267,10 @@ bool AvoidObstacleNode::check_2_turn()
   {
     // Set rotation speed
     if (last_bumper_detected_->bumper == last_bumper_detected_->RIGHT) {
+      obstacle_position_ = 1;  // Obstacle position in the right
       speed_rotation_angular_ = -SPEED_TURN_ANGULAR;
     } else {
+      obstacle_position_ = -1;  // Obstacle position in the left
       speed_rotation_angular_ = SPEED_TURN_ANGULAR;
     }
     return true;
@@ -324,15 +326,27 @@ void AvoidObstacleNode::set_rotation_time(float speed)
   if (speed < 0.0f) {
     speed *= -1;  // Make the time positive
   }
-  RCLCPP_INFO(get_logger(), "Set time: %f", (SPEED_TURN_ANGULAR / speed) * 12);
   rclcpp::Duration ROTATING_TIME {(SPEED_TURN_ANGULAR / speed) * 12s};
 }
 
 bool AvoidObstacleNode::check_2_backward()
 {
   // This shold never happend under normal conditions
-  return last_bumper_detected_ != nullptr &&
-         last_bumper_detected_->state == last_bumper_detected_->PRESSED;
+  // Check if the bumper has been triggered
+  if (last_bumper_detected_ != nullptr &&
+    last_bumper_detected_->state == last_bumper_detected_->PRESSED)
+  {
+    // Set rotation speed
+    if (last_bumper_detected_->bumper == last_bumper_detected_->RIGHT) {
+      obstacle_position_ = 1;  // Obstacle position in the right
+      speed_rotation_angular_ = -SPEED_TURN_ANGULAR;
+    } else {
+      obstacle_position_ = -1;  // Obstacle position in the left
+      speed_rotation_angular_ = SPEED_TURN_ANGULAR;
+    }
+    return true;
+  }
+  return false;
 }
 
 bool AvoidObstacleNode::check_backward_2_turn()
