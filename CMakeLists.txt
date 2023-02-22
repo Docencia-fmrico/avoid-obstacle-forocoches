@@ -11,6 +11,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(kobuki_ros_interfaces REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
 
 set(dependencies
   rclcpp
@@ -18,6 +19,7 @@ set(dependencies
   geometry_msgs
   kobuki_ros_interfaces
   std_msgs
+  visualization_msgs
 )
 
 include_directories(include)
