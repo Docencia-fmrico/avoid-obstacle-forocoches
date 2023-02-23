@@ -43,24 +43,8 @@ AvoidObstacleNode::AvoidObstacleNode()
   timer_ = create_wall_timer(
     100ms, std::bind(&AvoidObstacleNode::control_cycle, this));
 
-  // Declare parameter
-  declare_parameter("SPEED_STOP_LINEAR", 0.0f);
-  declare_parameter("SPEED_STOP_ANGULAR", 0.0f);
-  declare_parameter("SPEED_FORWARD_LINEAR", 0.3f);
-  declare_parameter("SPEED_FORWARD_ANGULAR", 0.0f);
-  declare_parameter("SPEED_TURN_LINEAR", 0.0f);
-  declare_parameter("SPEED_TURN_ANGULAR", 0.4f);
-  declare_parameter("OBSTACLE_DISTANCE_THRESHOLD", 1.0f);
-
-  // Retrieve parameters
-  get_parameter("SPEED_STOP_LINEAR", SPEED_STOP_LINEAR);
-  get_parameter("SPEED_STOP_ANGULAR", SPEED_STOP_ANGULAR);
-  get_parameter("SPEED_FORWARD_LINEAR", SPEED_FORWARD_LINEAR);
-  get_parameter("SPEED_FORWARD_ANGULAR", SPEED_FORWARD_ANGULAR);
-  get_parameter("SPEED_TURN_LINEAR", SPEED_TURN_LINEAR);
-  get_parameter("SPEED_TURN_ANGULAR", SPEED_TURN_ANGULAR);
-  get_parameter("OBSTACLE_DISTANCE_THRESHOLD", OBSTACLE_DISTANCE_THRESHOLD);
-
+  // Set turning time
+  TURNING_TIME = (M_PI / (SPEED_TURN_ANGULAR * 2)) * 1s;
   // Initialize the last state to stop
   last_state_ = STOP;
 }
@@ -73,16 +57,14 @@ void AvoidObstacleNode::scan_callback(sensor_msgs::msg::LaserScan::UniquePtr msg
 void AvoidObstacleNode::button_callback(kobuki_ros_interfaces::msg::ButtonEvent::UniquePtr msg)
 {
   last_button_pressed_ = std::move(msg);
-  if (last_button_pressed_->state == kobuki_ros_interfaces::msg::ButtonEvent::PRESSED)
-  {
-    if (last_button_pressed_->button == kobuki_ros_interfaces::msg::ButtonEvent::BUTTON1)
-    {
+  if (last_button_pressed_->state == kobuki_ros_interfaces::msg::ButtonEvent::PRESSED) {
+    if (last_button_pressed_->button == kobuki_ros_interfaces::msg::ButtonEvent::BUTTON1) {
       button_pressed_ = !button_pressed_;
-    } else if (last_button_pressed_->button == kobuki_ros_interfaces::msg::ButtonEvent::BUTTON2 &&
-      !button_pressed_) {
+    } else if (last_button_pressed_->button == kobuki_ros_interfaces::msg::ButtonEvent::BUTTON2 && // NOLINT
+      !button_pressed_)
+    {
       last_state_ = STOP;
     }
-    
   }
 }
 
@@ -91,7 +73,8 @@ void AvoidObstacleNode::wheel_drop_callback(
 {
   last_wheel_dropped_ = std::move(msg);
   // Not on the ground
-  kobuki_not_on_ground_ = last_wheel_dropped_->state == kobuki_ros_interfaces::msg::WheelDropEvent::DROPPED;
+  kobuki_not_on_ground_ = last_wheel_dropped_->state ==
+    kobuki_ros_interfaces::msg::WheelDropEvent::DROPPED;
 }
 
 void AvoidObstacleNode::bumper_callback(kobuki_ros_interfaces::msg::BumperEvent::UniquePtr msg)
@@ -109,15 +92,18 @@ void AvoidObstacleNode::control_cycle()
   }
 
   debug_msg_.data = DebugNode::OK;
-  print_markers();
+  set_markers();
   // FSM
   switch (state_) {
     case STOP:
       out_vel_.linear.x = SPEED_STOP_LINEAR;
       out_vel_.angular.z = SPEED_STOP_ANGULAR;
       if (stopped_with_error_) {
-        if (kobuki_not_on_ground_) {debug_msg_.data = DebugNode::NOT_ON_GROUND;}
-        else {debug_msg_.data = DebugNode::ERROR;}
+        if (kobuki_not_on_ground_) {
+          debug_msg_.data = DebugNode::NOT_ON_GROUND;
+        } else {
+          debug_msg_.data = DebugNode::ERROR;
+        }
       } else {
         // Waiting for button press
         debug_msg_.data = DebugNode::READY;
@@ -267,9 +253,9 @@ bool AvoidObstacleNode::check_2_turn()
 
   int size = last_scan_->ranges.size();
   reduced_threshold_ = 0.0f;
-  reduced_non_detection_threshold_ = MIN_THRESHOLD - 0.03f * (current_range / 5);
-  if (reduced_non_detection_threshold_ <= NON_DETECTION_THRESHOLD) {
-    reduced_non_detection_threshold_ = NON_DETECTION_THRESHOLD + 0.01f;
+  reduced_min_threshold_ = MIN_THRESHOLD - 0.03f * (current_range / 5);
+  if (reduced_min_threshold_ <= NON_DETECTION_THRESHOLD) {
+    reduced_min_threshold_ = NON_DETECTION_THRESHOLD + 0.01f;
   }
 
   // Check if the bumper has been triggered
@@ -290,11 +276,11 @@ bool AvoidObstacleNode::check_2_turn()
   // Left range
   for (int i = 0; i < (size / 2); i++) {
     reduced_threshold_ = OBSTACLE_DISTANCE_THRESHOLD -
-      (OBSTACLE_DISTANCE_THRESHOLD - reduced_non_detection_threshold_) *
+      (OBSTACLE_DISTANCE_THRESHOLD - reduced_min_threshold_) *
       i / (size / current_range);
 
-    if (reduced_threshold_ < reduced_non_detection_threshold_) {
-      reduced_threshold_ = reduced_non_detection_threshold_;
+    if (reduced_threshold_ < reduced_min_threshold_) {
+      reduced_threshold_ = reduced_min_threshold_;
     }
     if (last_scan_->ranges[i] < reduced_threshold_ &&
       last_scan_->ranges[i] > NON_DETECTION_THRESHOLD)
@@ -309,11 +295,11 @@ bool AvoidObstacleNode::check_2_turn()
   // Right range
   for (int i = size - 1; i > (size - (size / 2)); i--) {
     reduced_threshold_ = OBSTACLE_DISTANCE_THRESHOLD -
-      (OBSTACLE_DISTANCE_THRESHOLD - reduced_non_detection_threshold_) *
+      (OBSTACLE_DISTANCE_THRESHOLD - reduced_min_threshold_) *
       (size - i) / (size / current_range);
 
-    if (reduced_threshold_ < reduced_non_detection_threshold_) {
-      reduced_threshold_ = reduced_non_detection_threshold_;
+    if (reduced_threshold_ < reduced_min_threshold_) {
+      reduced_threshold_ = reduced_min_threshold_;
     }
     if (last_scan_->ranges[i] < reduced_threshold_ &&
       last_scan_->ranges[i] > NON_DETECTION_THRESHOLD)
@@ -330,27 +316,13 @@ bool AvoidObstacleNode::check_2_turn()
 bool AvoidObstacleNode::check_rotation_2_forward()
 {
   // Go forward when it finishes rotating
-  return (now() - state_timestamp_) > ROTATING_TIME;
+  return (now() - state_timestamp_) > rotating_time_;
 }
 
 bool AvoidObstacleNode::check_rotation_2_turn_time()
 {
   // Go forward when it finishes rotating
   return (now() - state_timestamp_) < MIN_ROTATING_TIME;
-}
-
-void AvoidObstacleNode::set_rotation_parameters(float radius)
-{ 
-  // Set rotation speed
-  speed_rotation_angular_ = - (obstacle_position_ * SPEED_FORWARD_LINEAR /
-    (radius * 2));
-
-  // Set rotation time
-  // Time = circunf / SPEED_FORWARD_LINEAR
-  float time = (2 * M_PI * radius) / SPEED_FORWARD_LINEAR;
-  RCLCPP_INFO(get_logger(), "Speed: %f", speed_rotation_angular_);
-  RCLCPP_INFO(get_logger(), "Speed time: %f", time);
-  ROTATING_TIME = (time + 2) * 1s;
 }
 
 bool AvoidObstacleNode::check_2_backward()
@@ -381,7 +353,7 @@ bool AvoidObstacleNode::check_backward_2_turn()
 
 double AvoidObstacleNode::set_rotation_radius(int degrees, float distance)
 {
-  // New method
+  // ALgorithm explained
   // l0 = distance; index = degrees
   // lc = l0 * cos (alpha * index);
   // c = l0 * sin (alpha * index);
@@ -389,16 +361,15 @@ double AvoidObstacleNode::set_rotation_radius(int degrees, float distance)
   // delta = atan2(c,lc)
   // gamma = beta + delta;
   // const gamma if it isn't object ended
-  double alpha = last_scan_->angle_increment;  // in rads
+
+  const double alpha = last_scan_->angle_increment;  // in rads = 1º
   double beta, delta, gamma;  // in rads
-  double lc, c;
+  double lc, c;  // in meters
   int ref_index = 0;
   int ref_degree = 0;
-  double precission = 0.1;
-  int size = last_scan_->ranges.size();
+  const int size = last_scan_->ranges.size();
   int tries = 0;
   double rotation_rad = 1.0;
-  double min_rotation_rad = 0.5;
 
   if (obstacle_position_ == OBJECT_IN_RIGHT) {  // Object in right size
     // See left range
@@ -415,10 +386,9 @@ double AvoidObstacleNode::set_rotation_radius(int degrees, float distance)
     gamma = beta + delta;  // In rads
     double ref_gamma = gamma;  // In rads
     // New approach
-    while (ref_gamma + precission > gamma && ref_gamma - precission < gamma) {
+    while (ref_gamma + DETECTION_PRECISION > gamma && ref_gamma - DETECTION_PRECISION < gamma) {
       // Check if the distance detected is infinite
       if (std::isinf(last_scan_->ranges[ref_index])) {
-        RCLCPP_INFO(get_logger(), "EXIT_INF : %d", ref_index);
         break;
       }
 
@@ -428,10 +398,6 @@ double AvoidObstacleNode::set_rotation_radius(int degrees, float distance)
       delta = atan2(c, lc);  // In rads
       gamma = beta + delta;  // In rads
 
-      RCLCPP_INFO(get_logger(), "Check left size info : %d", ref_index);
-      RCLCPP_INFO(get_logger(), "Check left size info : l0 = %f", distance);
-      RCLCPP_INFO(get_logger(), "Check left size info : %f of %f|%f|%f|%f",last_scan_->ranges[ref_index] ,lc,c,beta,delta);
-      RCLCPP_INFO(get_logger(), "Check left size info : %f of %f", gamma, ref_gamma);
       // Update ref_index
       ref_index = (ref_index + 1) % size;
       ref_degree++;
@@ -442,7 +408,7 @@ double AvoidObstacleNode::set_rotation_radius(int degrees, float distance)
       // Exit if infinite loop
       tries++;
       if (tries >= size) {
-          return 3.0;
+        return 3.0;
       }
     }
     // Have found a match
@@ -467,10 +433,9 @@ double AvoidObstacleNode::set_rotation_radius(int degrees, float distance)
     double ref_gamma = gamma;  // In rads
 
     // New approach
-    while (ref_gamma + precission > gamma && ref_gamma - precission < gamma) {
+    while (ref_gamma + DETECTION_PRECISION > gamma && ref_gamma - DETECTION_PRECISION < gamma) {
       // Check if the distance detected is infinite
       if (std::isinf(last_scan_->ranges[ref_index])) {
-        RCLCPP_INFO(get_logger(), "EXIT_INF : %d", ref_index);
         break;
       }
 
@@ -480,10 +445,6 @@ double AvoidObstacleNode::set_rotation_radius(int degrees, float distance)
       delta = atan2(c, lc);  // In rads
       gamma = beta + delta;  // In rads
 
-      RCLCPP_INFO(get_logger(), "Check right size info : %d", ref_index);
-      RCLCPP_INFO(get_logger(), "Check right size info : l0 = %f", distance);
-      RCLCPP_INFO(get_logger(), "Check right size info : %f of %f|%f|%f|%f",last_scan_->ranges[ref_index] ,lc,c,beta,delta);
-      RCLCPP_INFO(get_logger(), "Check right size info : %f of %f", gamma, ref_gamma);
       // Update ref_index
       ref_index--;
       if (ref_index < 0) {
@@ -509,19 +470,32 @@ double AvoidObstacleNode::set_rotation_radius(int degrees, float distance)
   // Check if is inf
   if (std::isinf(rotation_rad)) {
     rotation_rad = 3.0;
-  }  
-  RCLCPP_INFO(get_logger(), "Rotation radius info : %d", ref_index);
-  RCLCPP_INFO(get_logger(), "Rotation radius : %f", rotation_rad);
+  }
 
   // Check if min rotation rad
-  if (rotation_rad < min_rotation_rad) {
-    rotation_rad = min_rotation_rad;
+  if (rotation_rad < MIN_ROTATION_RADIUS) {
+    rotation_rad = MIN_ROTATION_RADIUS;
   }
 
   return rotation_rad;
 }
 
-void AvoidObstacleNode::print_markers(){
+void AvoidObstacleNode::set_rotation_parameters(float radius)
+{
+  // Set rotation speed
+  speed_rotation_angular_ = -(obstacle_position_ * SPEED_FORWARD_LINEAR /
+    (radius * 2));
+
+  // Set rotation time
+  // Time = circunf / SPEED_FORWARD_LINEAR
+  float time = (2 * M_PI * radius) / SPEED_FORWARD_LINEAR;
+  RCLCPP_INFO(get_logger(), "Speed: %f", speed_rotation_angular_);
+  RCLCPP_INFO(get_logger(), "Speed time: %f", time);
+  rotating_time_ = (time + 2) * 1s;
+}
+
+void AvoidObstacleNode::set_markers()
+{
   int size = last_scan_->ranges.size();
   float alpha = last_scan_->angle_increment;
 
@@ -529,26 +503,30 @@ void AvoidObstacleNode::print_markers(){
   for (int i = 0; i < size; i++) {
     if (i < size / 2) {
       reduced_threshold_ = OBSTACLE_DISTANCE_THRESHOLD -
-        (OBSTACLE_DISTANCE_THRESHOLD - reduced_non_detection_threshold_) * i / (size / current_range);
+        (OBSTACLE_DISTANCE_THRESHOLD - reduced_min_threshold_) * i / (size / current_range);
     } else {
       reduced_threshold_ = OBSTACLE_DISTANCE_THRESHOLD -
-        (OBSTACLE_DISTANCE_THRESHOLD - reduced_non_detection_threshold_) * (size - i) / (size / current_range);
+        (OBSTACLE_DISTANCE_THRESHOLD - reduced_min_threshold_) * (size - i) /
+        (size / current_range);
     }
-    if (reduced_threshold_ < reduced_non_detection_threshold_) {reduced_threshold_ = reduced_non_detection_threshold_;}
+    if (reduced_threshold_ < reduced_min_threshold_) {reduced_threshold_ = reduced_min_threshold_;}
     // Publish and create the markers
     // First for detection
     marker_msg_.markers.push_back(set_marker(alpha * i, reduced_threshold_, i));
     // Second for range
-    visualization_msgs::msg::Marker range_marker = set_marker(alpha * i, OBSTACLE_DISTANCE_THRESHOLD, i + size);
+    visualization_msgs::msg::Marker range_marker = set_marker(
+      alpha * i, OBSTACLE_DISTANCE_THRESHOLD, i + size);
     range_marker.color.r = 0.0;
     marker_msg_.markers.push_back(range_marker);
     // Third for min range
-    visualization_msgs::msg::Marker min_range_marker = set_marker(alpha * i, NON_DETECTION_THRESHOLD, i + size * 2);
+    visualization_msgs::msg::Marker min_range_marker = set_marker(
+      alpha * i, NON_DETECTION_THRESHOLD, i + size * 2);
     min_range_marker.color.r = 0.0;
     marker_msg_.markers.push_back(min_range_marker);
     // Fourth for detection
-    if ( !std::isinf(last_scan_->ranges[i])) {
-      visualization_msgs::msg::Marker detected_marker = set_marker(alpha * i, last_scan_->ranges[i], i + size * 3);
+    if (!std::isinf(last_scan_->ranges[i])) {
+      visualization_msgs::msg::Marker detected_marker = set_marker(
+        alpha * i, last_scan_->ranges[i], i + size * 3);
       detected_marker.color.g = 0.0;
       marker_msg_.markers.push_back(detected_marker);
     }
@@ -587,7 +565,7 @@ visualization_msgs::msg::Marker AvoidObstacleNode::set_marker(float alpha, float
   marker.color.r = 1.0;
   marker.color.g = 1.0;
   marker.color.b = 1.0;
-  marker.color.a = 1.0; // Don't forget to set the alpha!
+  marker.color.a = 1.0;  // Don't forget to set the alpha!
 
   return marker;
 }

@@ -72,17 +72,18 @@ private:
   int state_;
   int last_state_;
   bool finished_rotation_;
-  bool stopped_with_error_ = false;
   bool button_pressed_ = false;
-  bool kobuki_not_on_ground_ = false;
   rclcpp::Time state_timestamp_;
+  // FSM error
+  bool stopped_with_error_ = false;
+  bool kobuki_not_on_ground_ = false;
+  const rclcpp::Duration LASER_SCAN_TIMEOUT {1s};
   // FSM states
   static const int STOP = 0;
   static const int FORWARD = 1;
   static const int TURN = 2;
   static const int ROTATION = 3;
-  // Only used in extreme conditions
-  static const int BACKWARD = 4;
+  static const int BACKWARD = 4;  // Only used in extreme conditions
   // FSM changes
   /**
    * @brief Change the state
@@ -127,11 +128,6 @@ private:
    */
   bool check_rotation_2_turn_time();
   /**
-   * @brief Set the rotation time and speed
-   * @param radius: rotation radius
-   */
-  void set_rotation_parameters(float radius);
-  /**
    * @brief Check if the bumper has detected an object
    * @return true
    * @return false
@@ -144,39 +140,65 @@ private:
    */
   bool check_backward_2_turn();
 
-  // Velocity control
-  float SPEED_STOP_LINEAR;
-  float SPEED_STOP_ANGULAR;
-  float SPEED_FORWARD_LINEAR;
-  float SPEED_FORWARD_ANGULAR;
-  float SPEED_TURN_LINEAR;
-  float SPEED_TURN_ANGULAR;
+  // --------- Velocity control ------------
+  // Constants
+  float SPEED_STOP_LINEAR = 0.0f ;
+  float SPEED_STOP_ANGULAR = 0.0f;
+  float SPEED_FORWARD_LINEAR = 0.3f;
+  float SPEED_FORWARD_ANGULAR = 0.0f;
+  float SPEED_TURN_LINEAR = 0.0f;
+  float SPEED_TURN_ANGULAR = 0.4f;
   float speed_rotation_angular_ = 0.0f;
-  const rclcpp::Duration TURNING_TIME {4s};
+  // Times
   const rclcpp::Duration MIN_ROTATING_TIME {1s};
-  rclcpp::Duration ROTATING_TIME {12s};
   const rclcpp::Duration BACKWARD_TIME {1s};
+  // Times that depend on speed
+  rclcpp::Duration TURNING_TIME {1s};
+  rclcpp::Duration rotating_time_ {1s};
 
-  // Obstacle control
+  // --------- Obstacle control ------------
   // Sides
   const int OBJECT_IN_LEFT = -1;
   const int OBJECT_IN_RIGHT = 1;
   int obstacle_position_ = 0;
   // Constant ranges
-  float OBSTACLE_DISTANCE_THRESHOLD;
-  int MIN_LASER_RANGE = 4;  // Half of the range
+  float OBSTACLE_DISTANCE_THRESHOLD = 1.0f;
   float MIN_THRESHOLD = 0.4f;
   float NON_DETECTION_THRESHOLD = 0.25f;
+  int MIN_LASER_RANGE = 4;  // Half of the range
   // Variable ranges
   float reduced_threshold_ = 0.0f;
-  float reduced_non_detection_threshold_ = 0.3f;
+  float reduced_min_threshold_ = 0.3f;
   int current_range = MIN_LASER_RANGE;  // Higher = less range
-  const rclcpp::Duration LASER_SCAN_TIMEOUT {1s};
-  // Algorithm
+  // Detection Algorithm
+  /**
+   * @brief Set the rotation radius
+   * @param degrees: ranges index
+   * @param distance
+   * @return double
+   */
   double set_rotation_radius(int degrees, float distance);
+  /**
+   * @brief Set the rotation time and speed
+   * @param radius: rotation radius
+   */
+  void set_rotation_parameters(float radius);
+  // Detection Algorithm constants
+  double DETECTION_PRECISION = 0.1f;  // In rads = 5º
+  double MIN_ROTATION_RADIUS = 0.5f;
 
-  // Rviz control
-  void print_markers();
+  // --------- Rviz control ------------
+  /**
+   * @brief Set the markers array for rviz2
+   */
+  void set_markers();
+  /**
+   * @brief Set the marker for rviz2
+   * @param alpha: angle
+   * @param distance
+   * @param id
+   * @return visualization_msgs::msg::Marker
+   */
   visualization_msgs::msg::Marker set_marker(float alpha, float distance, int id);
 };
 

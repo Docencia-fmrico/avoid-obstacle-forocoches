@@ -19,18 +19,14 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-
-    pkg_dir = get_package_share_directory('avoid_obstacle_forocoches')
-    param_file = os.path.join(pkg_dir, 'config', 'params.yaml')
-
     avoid_obstacle_cmd = Node(
                               package='avoid_obstacle_forocoches',
                               executable='avoid_obstacle',
                               output='screen',
                               parameters=[{
-                                'use_sim_time': False
-                              }, param_file],
-                              arguments=['--ros-args', '--log-level', 'info'],
+                                'use_sim_time': True
+                              }],
+                              arguments=['--ros-args', '--log-level', 'debug'],
                               remappings=[
                                 ('input_scan', '/scan'),
                                 ('output_vel', '/cmd_vel'),
