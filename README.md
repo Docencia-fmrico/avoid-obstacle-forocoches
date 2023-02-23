@@ -28,32 +28,61 @@ Imágenes:
 
 ## Máquina de estados implementada para este modelo
 
-[IMAGEN]
+![Imagen FSM](media/FSMAvoidObstacle.jpg)
 
 ## Características de uso e implementación
+* Uso del bumper para la detección de escalones u objetos a los que el lidar no detecte
+* Botón de detención y botón de reset
+* Parada de emergencia si el kobuki tiene una de sus ruedas en el aire
+* Zonas de detección dinámicas de objetos 360º
+* Rotación en ambos sentidos
+* Interfaz de rviz para visualizar las zonas de detección dinámicas del láser
 
+[rviz](media/rviz.mp4)
 
+* Algoritmo de detección de fin de objeto
 
-# Versión 2: Avoid_obstacle_advanced
+![Imagen algoritmo 1](media/algoritmo1.png)
 
-## Contenido multimedia
+![Imagen algoritmo 2](media/algoritmo2.png)
 
-[VÍDEO]
+* Uso de interfaz de debug en un nodo aparte. Para saber más información sobre la interfaz de debug, vaya al siguiente [repositorio](https://github.com/javizqh/Debug-Interface-Kobuki).
 
-## Máquina de estados implementada para este modelo
+## Instalación
+Clone el repositorio a un workspace, recomendamos clonarlo en el workspace de creado para alojar [ir_robots](https://github.com/IntelligentRoboticsLabs/ir_robots).
+A continuación, compile el código como se muestra en el video:
 
-[IMAGEN]
+![compile](media/compile.gif)
 
-## Características de uso e implementación
+```bash
+    # Asegurate de estar en el workspace
+    colcon build --symlink-install
+```
 
-A diferencia del modelo explicado previamente, está implementación está basada en un nodo cuya responsabilidad es la de analizar y gestionar el comportamiento del robot Kobuki basándose en la información que va tomando del láser. Además, la máquina de estados usada para este modelo se basa en una máquina de estados finitos bidimensional probabilística, que es capaz de mapear el entorno e ir esquivando los obstáculos que se encuentra en el camino.
+Luego para lanzarlo siga las siguientes instrucciones:
 
-La implementación de este modelo está principalmente compuesta por cuatro grandes funciones, una por cada algoritmo implementado. A continuación se detalla una breve explicación de cada uno de ellos:
+![launch](media/launch.gif)
 
-* Sectorización de valores (sectorize()): Divide un conjunto de valores float (asociados al láser) en un conjunto de sectores.
+```bash
+    # Asegurate de tener el workspace activado
+    ros2 launch avoid_obstacle_forocoches avoid_obstacle.launch.py 
+```
 
-* Búsqueda de obstáculos (obstacleAnalyze()): Calcula el peligro asociado a una determinada sectorización acorde a los valores obtenidos anteriormente, devolviendo un valor booleano en caso de que no haya peligro (0) o se detecte algún obstáculo (1).
+Si quieres usarlo en el simulador usa:
 
-* Distancia al obstáculo(calculate_side_to_avoid_obstacle()): Determina cuál es el mejor lado para evitar un obstáculo, en otras palabras, decide qué sector de los valores obtenidos por el láser le debe dar más prioridad en caso de que se detecte un obstáculo.
+```bash
+    # Asegurate de tener el workspace activado
+    # Lanza el simulador en otra terminal
+    ros2 launch avoid_obstacle_forocoches avoid_obstacle_sim.launch.py 
+    # En otra terminal manda un topic del boton
+    ros2 topic pub /events/button kobuki_ros_interfaces/msg/ButtonEvent "button: 1
+state: 1" -t 1
+```
 
-* Valores de intensidad (setIntensities()): Traduce uno de los sectores de valores obtenidos anteriormente a un mapa de calor para después graficarlos.
+## Problemas
+Durante la práctica hemos tenido problemas al principio para instalar ros2.
+
+Luego, los problemas más importantes han sido los errores obtenidos al usar parametros, por lo que no los hemos podido usar al final.
+
+## Otros
+Tenemos hechos más modelos aunque se encuentran incompletos en las carpetas ocultas model-*/
