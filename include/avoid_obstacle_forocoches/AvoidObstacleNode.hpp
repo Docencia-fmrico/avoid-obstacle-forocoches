@@ -127,10 +127,10 @@ private:
    */
   bool check_rotation_2_turn_time();
   /**
-   * @brief Set the rotation time
-   * @param speed: rotation speed
+   * @brief Set the rotation time and speed
+   * @param radius: rotation radius
    */
-  void set_rotation_time(float speed);
+  void set_rotation_parameters(float radius);
   /**
    * @brief Check if the bumper has detected an object
    * @return true
@@ -152,21 +152,28 @@ private:
   float SPEED_TURN_LINEAR;
   float SPEED_TURN_ANGULAR;
   float speed_rotation_angular_ = 0.0f;
-  const rclcpp::Duration TURNING_TIME {6s};
+  const rclcpp::Duration TURNING_TIME {4s};
   const rclcpp::Duration MIN_ROTATING_TIME {1s};
   rclcpp::Duration ROTATING_TIME {12s};
   const rclcpp::Duration BACKWARD_TIME {1s};
 
-  // Laser control
+  // Obstacle control
+  // Sides
+  const int OBJECT_IN_LEFT = -1;
+  const int OBJECT_IN_RIGHT = 1;
+  int obstacle_position_ = 0;
+  // Constant ranges
   float OBSTACLE_DISTANCE_THRESHOLD;
   int MIN_LASER_RANGE = 4;  // Half of the range
   float MIN_THRESHOLD = 0.4f;
-  float reduced_threshold_ = 0.0f;
   float NON_DETECTION_THRESHOLD = 0.25f;
-  float reduced_non_detection_threshold_ = 0.25f;
+  // Variable ranges
+  float reduced_threshold_ = 0.0f;
+  float reduced_non_detection_threshold_ = 0.3f;
   int current_range = MIN_LASER_RANGE;  // Higher = less range
-  int obstacle_position_ = 0;  // -1 Left / 1 Right
   const rclcpp::Duration LASER_SCAN_TIMEOUT {1s};
+  // Algorithm
+  double set_rotation_radius(int degrees, float distance);
 
   // Rviz control
   void print_markers();
