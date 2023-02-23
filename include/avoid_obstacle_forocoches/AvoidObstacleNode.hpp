@@ -11,7 +11,13 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
+/**
+ * @file AvoidObstacleNode.hpp
+ * @author Forocoches
+ * @version 0.1
+ * @date 2023-02-23
+ * @copyright Copyright (c) 2023
+ */
 #ifndef AVOID_OBSTACLE_FOROCOCHES__AVOIDOBSTACLENODE_HPP_
 #define AVOID_OBSTACLE_FOROCOCHES__AVOIDOBSTACLENODE_HPP_
 
@@ -142,7 +148,7 @@ private:
 
   // --------- Velocity control ------------
   // Constants
-  float SPEED_STOP_LINEAR = 0.0f ;
+  float SPEED_STOP_LINEAR = 0.0f;
   float SPEED_STOP_ANGULAR = 0.0f;
   float SPEED_FORWARD_LINEAR = 0.3f;
   float SPEED_FORWARD_ANGULAR = 0.0f;

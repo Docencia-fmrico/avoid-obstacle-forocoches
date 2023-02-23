@@ -11,7 +11,13 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
+/**
+ * @file AvoidObstacleNode.cpp
+ * @author Forocoches
+ * @version 0.1
+ * @date 2023-02-23
+ * @copyright Copyright (c) 2023
+ */
 #include "avoid_obstacle_forocoches/AvoidObstacleNode.hpp"
 
 using namespace std::chrono_literals; // NOLINT
