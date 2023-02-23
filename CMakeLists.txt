@@ -26,7 +26,6 @@ include_directories(include)
 
 add_library(${PROJECT_NAME} SHARED
   src/avoid_obstacle_forocoches/AvoidObstacleNode.cpp
-  src/avoid_obstacle_forocoches/AvoidObstacleAdvancedNode.cpp
   src/avoid_obstacle_forocoches/DebugNode.cpp
 )
 ament_target_dependencies(${PROJECT_NAME} ${dependencies})
@@ -35,13 +34,8 @@ add_executable(avoid_obstacle src/avoid_obstacle_main.cpp)
 ament_target_dependencies(avoid_obstacle ${dependencies})
 target_link_libraries(avoid_obstacle ${PROJECT_NAME})
 
-add_executable(avoid_obstacle_advanced src/avoid_obstacle_advanced_main.cpp)
-ament_target_dependencies(avoid_obstacle_advanced ${dependencies})
-target_link_libraries(avoid_obstacle_advanced ${PROJECT_NAME})
-
 install(TARGETS
   avoid_obstacle
-  avoid_obstacle_advanced
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}
