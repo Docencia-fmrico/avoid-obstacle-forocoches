@@ -28,7 +28,7 @@ Imágenes:
 
 ## Máquina de estados implementada para este modelo
 
-https://raw.githubusercontent.com/aleon2020/avoid-obstacle-forocoches/modifying-README/home/aalberto/Escritorio/my_workspace/src/avoid-obstacle-forocoches
+[IMAGEN]
 
 ## Características de uso e implementación
 
