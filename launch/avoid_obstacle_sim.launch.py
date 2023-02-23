@@ -17,12 +17,12 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    avoid_obstacle_cmd = Node(
+    avoid_obstacle_sim_cmd = Node(
                               package='avoid_obstacle_forocoches',
                               executable='avoid_obstacle',
                               output='screen',
                               parameters=[{
-                                'use_sim_time': False
+                                'use_sim_time': True
                               }],
                               arguments=['--ros-args', '--log-level', 'debug'],
                               remappings=[
@@ -37,6 +37,6 @@ def generate_launch_description():
                               ])
 
     ld = LaunchDescription()
-    ld.add_action(avoid_obstacle_cmd)
+    ld.add_action(avoid_obstacle_sim_cmd)
 
     return ld
