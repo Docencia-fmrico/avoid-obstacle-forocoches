@@ -173,8 +173,6 @@ void AvoidObstacleNode::control_cycle()
       finished_rotation_ = false;
       out_vel_.linear.x = SPEED_FORWARD_LINEAR;
       out_vel_.angular.z = speed_rotation_angular_;
-      // Set rotation speed for the next rotation
-      set_rotation_time(speed_rotation_angular_);
       // Can go to stop, forward(Turn again in the opposite direction) or turn
       if (check_2_stop()) {
         change_state(STOP);
@@ -280,10 +278,10 @@ bool AvoidObstacleNode::check_2_turn()
   {
     // Set rotation speed
     if (last_bumper_detected_->bumper == last_bumper_detected_->RIGHT) {
-      obstacle_position_ = 1;  // Obstacle position in the right
+      obstacle_position_ = OBJECT_IN_RIGHT;  // Obstacle position in the right
       speed_rotation_angular_ = -SPEED_TURN_ANGULAR;
     } else {
-      obstacle_position_ = -1;  // Obstacle position in the left
+      obstacle_position_ = OBJECT_IN_LEFT;  // Obstacle position in the left
       speed_rotation_angular_ = SPEED_TURN_ANGULAR;
     }
     return true;
@@ -301,9 +299,9 @@ bool AvoidObstacleNode::check_2_turn()
     if (last_scan_->ranges[i] < reduced_threshold_ &&
       last_scan_->ranges[i] > NON_DETECTION_THRESHOLD)
     {
-      obstacle_position_ = -1;  // Obstacle position in the left
+      obstacle_position_ = OBJECT_IN_LEFT;  // Obstacle position in the left
       // Set rotation speed
-      speed_rotation_angular_ = SPEED_TURN_ANGULAR * (1 - (static_cast<float>(i) / (size / 2)) / 2);
+      set_rotation_parameters(set_rotation_radius(i, last_scan_->ranges[i]));
       return true;
     }
   }
@@ -320,12 +318,9 @@ bool AvoidObstacleNode::check_2_turn()
     if (last_scan_->ranges[i] < reduced_threshold_ &&
       last_scan_->ranges[i] > NON_DETECTION_THRESHOLD)
     {
-      obstacle_position_ = 1;  // Obstacle position in the right
+      obstacle_position_ = OBJECT_IN_RIGHT;  // Obstacle position in the right
       // Set rotation speed
-      speed_rotation_angular_ = -SPEED_TURN_ANGULAR *
-        (1 - ((size - static_cast<float>(i)) / (size / 2)) / 2);
-      marker_msg_.markers[i].color.b = 0.0f;
-      marker_msg_.markers[i].lifetime = rclcpp::Duration(5s);
+      set_rotation_parameters(set_rotation_radius(i, last_scan_->ranges[i]));
       return true;
     }
   }
@@ -341,15 +336,21 @@ bool AvoidObstacleNode::check_rotation_2_forward()
 bool AvoidObstacleNode::check_rotation_2_turn_time()
 {
   // Go forward when it finishes rotating
-  return (now() - state_timestamp_) > MIN_ROTATING_TIME;
+  return (now() - state_timestamp_) < MIN_ROTATING_TIME;
 }
 
-void AvoidObstacleNode::set_rotation_time(float speed)
-{
-  if (speed < 0.0f) {
-    speed *= -1;  // Make the time positive
-  }
-  rclcpp::Duration ROTATING_TIME {(SPEED_TURN_ANGULAR / speed) * 12s};
+void AvoidObstacleNode::set_rotation_parameters(float radius)
+{ 
+  // Set rotation speed
+  speed_rotation_angular_ = - (obstacle_position_ * SPEED_FORWARD_LINEAR /
+    (radius * 2));
+
+  // Set rotation time
+  // Time = circunf / SPEED_FORWARD_LINEAR
+  float time = (2 * M_PI * radius) / SPEED_FORWARD_LINEAR;
+  RCLCPP_INFO(get_logger(), "Speed: %f", speed_rotation_angular_);
+  RCLCPP_INFO(get_logger(), "Speed time: %f", time);
+  ROTATING_TIME = (time + 2) * 1s;
 }
 
 bool AvoidObstacleNode::check_2_backward()
@@ -378,6 +379,148 @@ bool AvoidObstacleNode::check_backward_2_turn()
   return (now() - state_timestamp_) > BACKWARD_TIME;
 }
 
+double AvoidObstacleNode::set_rotation_radius(int degrees, float distance)
+{
+  // New method
+  // l0 = distance; index = degrees
+  // lc = l0 * cos (alpha * index);
+  // c = l0 * sin (alpha * index);
+  // beta = atan2(l-lc, c);
+  // delta = atan2(c,lc)
+  // gamma = beta + delta;
+  // const gamma if it isn't object ended
+  double alpha = last_scan_->angle_increment;  // in rads
+  double beta, delta, gamma;  // in rads
+  double lc, c;
+  int ref_index = 0;
+  int ref_degree = 0;
+  double precission = 0.1;
+  int size = last_scan_->ranges.size();
+  int tries = 0;
+  double rotation_rad = 1.0;
+  double min_rotation_rad = 0.5;
+
+  if (obstacle_position_ == OBJECT_IN_RIGHT) {  // Object in right size
+    // See left range
+    // Get the first gamma as reference
+    ref_index = degrees + 1;
+    if (ref_index >= size) {
+      ref_index = 0;
+    }
+    ref_degree++;
+    lc = distance * cos(alpha * ref_degree);
+    c = distance * sin(alpha * ref_degree);
+    beta = atan2(last_scan_->ranges[ref_index] - lc, c);  // In rads
+    delta = atan2(c, lc);  // In rads
+    gamma = beta + delta;  // In rads
+    double ref_gamma = gamma;  // In rads
+    // New approach
+    while (ref_gamma + precission > gamma && ref_gamma - precission < gamma) {
+      // Check if the distance detected is infinite
+      if (std::isinf(last_scan_->ranges[ref_index])) {
+        RCLCPP_INFO(get_logger(), "EXIT_INF : %d", ref_index);
+        break;
+      }
+
+      lc = distance * cos(alpha * ref_degree);
+      c = distance * sin(alpha * ref_degree);
+      beta = atan2(last_scan_->ranges[ref_index] - lc, c);  // In rads
+      delta = atan2(c, lc);  // In rads
+      gamma = beta + delta;  // In rads
+
+      RCLCPP_INFO(get_logger(), "Check left size info : %d", ref_index);
+      RCLCPP_INFO(get_logger(), "Check left size info : l0 = %f", distance);
+      RCLCPP_INFO(get_logger(), "Check left size info : %f of %f|%f|%f|%f",last_scan_->ranges[ref_index] ,lc,c,beta,delta);
+      RCLCPP_INFO(get_logger(), "Check left size info : %f of %f", gamma, ref_gamma);
+      // Update ref_index
+      ref_index = (ref_index + 1) % size;
+      ref_degree++;
+
+      // Update ref_gamma
+      ref_gamma = (ref_gamma + gamma) / 2;
+
+      // Exit if infinite loop
+      tries++;
+      if (tries >= size) {
+          return 3.0;
+      }
+    }
+    // Have found a match
+    ref_index -= 2;
+    if (ref_index < 0) {
+      ref_index = size - 1;
+    }
+
+  } else if (obstacle_position_ == OBJECT_IN_LEFT) {  // Object in left size
+    // See right range
+    // Get the first gamma as reference
+    ref_index = degrees - 1;
+    if (ref_index < 0) {
+      ref_index = size - 1;
+    }
+    ref_degree++;
+    lc = distance * cos(alpha * ref_degree);
+    c = distance * sin(alpha * ref_degree);
+    beta = atan2(last_scan_->ranges[ref_index] - lc, c);  // In rads
+    delta = atan2(c, lc);  // In rads
+    gamma = beta + delta;  // In rads
+    double ref_gamma = gamma;  // In rads
+
+    // New approach
+    while (ref_gamma + precission > gamma && ref_gamma - precission < gamma) {
+      // Check if the distance detected is infinite
+      if (std::isinf(last_scan_->ranges[ref_index])) {
+        RCLCPP_INFO(get_logger(), "EXIT_INF : %d", ref_index);
+        break;
+      }
+
+      lc = distance * cos(alpha * ref_degree);
+      c = distance * sin(alpha * ref_degree);
+      beta = atan2(last_scan_->ranges[ref_index] - lc, c);  // In rads
+      delta = atan2(c, lc);  // In rads
+      gamma = beta + delta;  // In rads
+
+      RCLCPP_INFO(get_logger(), "Check right size info : %d", ref_index);
+      RCLCPP_INFO(get_logger(), "Check right size info : l0 = %f", distance);
+      RCLCPP_INFO(get_logger(), "Check right size info : %f of %f|%f|%f|%f",last_scan_->ranges[ref_index] ,lc,c,beta,delta);
+      RCLCPP_INFO(get_logger(), "Check right size info : %f of %f", gamma, ref_gamma);
+      // Update ref_index
+      ref_index--;
+      if (ref_index < 0) {
+        ref_index = size - 1;
+      }
+      ref_degree++;
+
+      // Update ref_gamma
+      ref_gamma = (ref_gamma + gamma) / 2;
+
+      // Exit if infinite loop
+      tries++;
+      if (tries >= size) {
+        return 3.0;
+      }
+    }
+    // Have found a match
+    ref_index = (ref_index + 2) % size;
+  }
+  // We have reached the end of the object
+  rotation_rad = last_scan_->ranges[ref_index] * cos(alpha * ref_index);
+
+  // Check if is inf
+  if (std::isinf(rotation_rad)) {
+    rotation_rad = 3.0;
+  }  
+  RCLCPP_INFO(get_logger(), "Rotation radius info : %d", ref_index);
+  RCLCPP_INFO(get_logger(), "Rotation radius : %f", rotation_rad);
+
+  // Check if min rotation rad
+  if (rotation_rad < min_rotation_rad) {
+    rotation_rad = min_rotation_rad;
+  }
+
+  return rotation_rad;
+}
+
 void AvoidObstacleNode::print_markers(){
   int size = last_scan_->ranges.size();
   float alpha = last_scan_->angle_increment;
@@ -397,12 +540,18 @@ void AvoidObstacleNode::print_markers(){
     marker_msg_.markers.push_back(set_marker(alpha * i, reduced_threshold_, i));
     // Second for range
     visualization_msgs::msg::Marker range_marker = set_marker(alpha * i, OBSTACLE_DISTANCE_THRESHOLD, i + size);
-    range_marker.color.r = 0.0f;
+    range_marker.color.r = 0.0;
     marker_msg_.markers.push_back(range_marker);
     // Third for min range
     visualization_msgs::msg::Marker min_range_marker = set_marker(alpha * i, NON_DETECTION_THRESHOLD, i + size * 2);
-    min_range_marker.color.r = 0.0f;
+    min_range_marker.color.r = 0.0;
     marker_msg_.markers.push_back(min_range_marker);
+    // Fourth for detection
+    if ( !std::isinf(last_scan_->ranges[i])) {
+      visualization_msgs::msg::Marker detected_marker = set_marker(alpha * i, last_scan_->ranges[i], i + size * 3);
+      detected_marker.color.g = 0.0;
+      marker_msg_.markers.push_back(detected_marker);
+    }
   }
 }
 
