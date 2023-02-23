@@ -142,12 +142,12 @@ private:
 
   // --------- Velocity control ------------
   // Constants
-  float SPEED_STOP_LINEAR;
-  float SPEED_STOP_ANGULAR;
-  float SPEED_FORWARD_LINEAR;
-  float SPEED_FORWARD_ANGULAR;
-  float SPEED_TURN_LINEAR;
-  float SPEED_TURN_ANGULAR;
+  float SPEED_STOP_LINEAR = 0.0f ;
+  float SPEED_STOP_ANGULAR = 0.0f;
+  float SPEED_FORWARD_LINEAR = 0.3f;
+  float SPEED_FORWARD_ANGULAR = 0.0f;
+  float SPEED_TURN_LINEAR = 0.0f;
+  float SPEED_TURN_ANGULAR = 0.4f;
   float speed_rotation_angular_ = 0.0f;
   // Times
   const rclcpp::Duration MIN_ROTATING_TIME {1s};
@@ -162,10 +162,10 @@ private:
   const int OBJECT_IN_RIGHT = 1;
   int obstacle_position_ = 0;
   // Constant ranges
-  float OBSTACLE_DISTANCE_THRESHOLD;
-  float MIN_THRESHOLD;
-  float NON_DETECTION_THRESHOLD;
-  int MIN_LASER_RANGE;  // Half of the range
+  float OBSTACLE_DISTANCE_THRESHOLD = 1.0f;
+  float MIN_THRESHOLD = 0.4f;
+  float NON_DETECTION_THRESHOLD = 0.25f;
+  int MIN_LASER_RANGE = 4;  // Half of the range
   // Variable ranges
   float reduced_threshold_ = 0.0f;
   float reduced_min_threshold_ = 0.3f;
@@ -184,8 +184,8 @@ private:
    */
   void set_rotation_parameters(float radius);
   // Detection Algorithm constants
-  double DETECTION_PRECISION;  // In rads = 5º
-  double MIN_ROTATION_RADIUS;
+  double DETECTION_PRECISION = 0.1f;  // In rads = 5º
+  double MIN_ROTATION_RADIUS = 0.5f;
 
   // --------- Rviz control ------------
   /**

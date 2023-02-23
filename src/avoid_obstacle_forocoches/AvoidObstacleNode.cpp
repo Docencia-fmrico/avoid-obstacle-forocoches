@@ -20,34 +20,6 @@ using std::placeholders::_1;
 AvoidObstacleNode::AvoidObstacleNode()
 : Node("avoid_obstacle_node")
 {
-  // Declare parameters
-  declare_parameter("SPEED_STOP_LINEAR", 0.0f);
-  declare_parameter("SPEED_STOP_ANGULAR", 0.0f);
-  declare_parameter("SPEED_FORWARD_LINEAR", 0.3f);
-  declare_parameter("SPEED_FORWARD_ANGULAR", 0.0f);
-  declare_parameter("SPEED_TURN_LINEAR", 0.0f);
-  declare_parameter("SPEED_TURN_ANGULAR", 0.4f);
-  declare_parameter("OBSTACLE_DISTANCE_THRESHOLD", 1.0f);
-  declare_parameter("MIN_THRESHOLD", 0.4f);
-  declare_parameter("NON_DETECTION_THRESHOLD", 0.25f);
-  declare_parameter("MIN_LASER_RANGE", 4);
-  declare_parameter("DETECTION_PRECISION", 0.1f);
-  declare_parameter("MIN_ROTATION_RADIUS", 0.5f);
-
-  // Retrieve parameters
-  get_parameter("SPEED_STOP_LINEAR", SPEED_STOP_LINEAR);
-  get_parameter("SPEED_STOP_ANGULAR", SPEED_STOP_ANGULAR);
-  get_parameter("SPEED_FORWARD_LINEAR", SPEED_FORWARD_LINEAR);
-  get_parameter("SPEED_FORWARD_ANGULAR", SPEED_FORWARD_ANGULAR);
-  get_parameter("SPEED_TURN_LINEAR", SPEED_TURN_LINEAR);
-  get_parameter("SPEED_TURN_ANGULAR", SPEED_TURN_ANGULAR);
-  get_parameter("OBSTACLE_DISTANCE_THRESHOLD", OBSTACLE_DISTANCE_THRESHOLD);
-  get_parameter("MIN_THRESHOLD", MIN_THRESHOLD);
-  get_parameter("NON_DETECTION_THRESHOLD", NON_DETECTION_THRESHOLD);
-  get_parameter("MIN_LASER_RANGE", MIN_LASER_RANGE);
-  get_parameter("DETECTION_PRECISION", DETECTION_PRECISION);
-  get_parameter("MIN_ROTATION_RADIUS", MIN_ROTATION_RADIUS);
-
   vel_pub_ = create_publisher<geometry_msgs::msg::Twist>("output_vel", 10);
   marker_pub_ = create_publisher<visualization_msgs::msg::MarkerArray>("laser_marker", 1);
   debug_pub_ = create_publisher<DebugNode::DebugMessage>(DebugNode::TOPIC_NAME, 10);
