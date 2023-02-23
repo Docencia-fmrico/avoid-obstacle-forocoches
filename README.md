@@ -17,3 +17,43 @@ Puntuación (sobre 10):
 * +2 Readme.md bien documentado con videos.
 * -3 Warnings o que no pase los tests.
 * +1 Setup de CI/CD
+
+Imágenes:
+
+# Versión 1: Avoid_obstacle
+
+## Contenido multimedia
+
+[VÍDEO]
+
+## Máquina de estados implementada para este modelo
+
+[IMAGEN]
+
+## Características de uso e implementación
+
+
+
+# Versión 2: Avoid_obstacle_advanced
+
+## Contenido multimedia
+
+[VÍDEO]
+
+## Máquina de estados implementada para este modelo
+
+[IMAGEN]
+
+## Características de uso e implementación
+
+A diferencia del modelo explicado previamente, está implementación está basada en un nodo cuya responsabilidad es la de analizar y gestionar el comportamiento del robot Kobuki basándose en la información que va tomando del láser. Además, la máquina de estados usada para este modelo se basa en una máquina de estados finitos bidimensional probabilística, que es capaz de mapear el entorno e ir esquivando los obstáculos que se encuentra en el camino.
+
+La implementación de este modelo está principalmente compuesta por cuatro grandes funciones, una por cada algoritmo implementado. A continuación se detalla una breve explicación de cada uno de ellos:
+
+* Sectorización de valores (sectorize()): Divide un conjunto de valores float (asociados al láser) en un conjunto de sectores.
+
+* Búsqueda de obstáculos (obstacleAnalyze()): Calcula el peligro asociado a una determinada sectorización acorde a los valores obtenidos anteriormente, devolviendo un valor booleano en caso de que no haya peligro (0) o se detecte algún obstáculo (1).
+
+* Distancia al obstáculo(calculate_side_to_avoid_obstacle()): Determina cuál es el mejor lado para evitar un obstáculo, en otras palabras, decide qué sector de los valores obtenidos por el láser le debe dar más prioridad en caso de que se detecte un obstáculo.
+
+* Valores de intensidad (setIntensities()): Traduce uno de los sectores de valores obtenidos anteriormente a un mapa de calor para después graficarlos.
