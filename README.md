@@ -17,3 +17,33 @@ Puntuación (sobre 10):
 * +2 Readme.md bien documentado con videos.
 * -3 Warnings o que no pase los tests.
 * +1 Setup de CI/CD
+
+Imágenes:
+
+# Versión 1: Avoid_obstacle
+
+## Contenido multimedia
+
+[VÍDEO]
+
+## Máquina de estados implementada para este modelo
+
+[IMAGEN]
+
+## Características de uso e implementación
+
+...
+
+# Versión 2: Avoid_obstacle_advanced
+
+## Contenido multimedia
+
+[VÍDEO]
+
+## Máquina de estados implementada para este modelo
+
+[IMAGEN]
+
+## Características de uso e implementación
+
+...
