@@ -22,7 +22,7 @@ def generate_launch_description():
                               executable='avoid_obstacle',
                               output='screen',
                               parameters=[{
-                                'use_sim_time': True
+                                'use_sim_time': False
                               }],
                               arguments=['--ros-args', '--log-level', 'debug'],
                               remappings=[
