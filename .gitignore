@@ -37,7 +37,6 @@ build/*
 
 # Doxygen latex documentation
 doc/latex/*
-Doxyfile
 
 # Visual Studio settings
 .vscode/*
