@@ -142,7 +142,7 @@ private:
 
   // --------- Velocity control ------------
   // Constants
-  float SPEED_STOP_LINEAR = 0.0f ;
+  float SPEED_STOP_LINEAR = 0.0f;
   float SPEED_STOP_ANGULAR = 0.0f;
   float SPEED_FORWARD_LINEAR = 0.3f;
   float SPEED_FORWARD_ANGULAR = 0.0f;
