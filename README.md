@@ -1,4 +1,7 @@
 # ASR-0-AvoidObstacle
+![distro](https://img.shields.io/badge/Ubuntu%2022-Jammy%20Jellyfish-green)
+![distro](https://img.shields.io/badge/ROS2-Humble-blue)
+
 Práctica 0 - Arquitecturas Software para Robots 2023
 
 Crea un comportamiento autónomo de un robot usando una máquina de estado finito (FSM) para evitar obstáculos:
@@ -23,28 +26,32 @@ Imágenes:
 # Versión 1: Avoid_obstacle
 
 ## Contenido multimedia
-
-[VÍDEO]
+https://user-images.githubusercontent.com/92941117/221051373-3c27738c-c656-4f15-8bcb-dc93dd8464cc.mp4
 
 ## Máquina de estados implementada para este modelo
 
-![Imagen FSM](media/FSMAvoidObstacle.jpg)
+<p align="center">
+     <img src="media/FSMAvoidObstacle.jpg">
+</p>
 
-## Características de uso e implementación
-* Uso del bumper para la detección de escalones u objetos a los que el lidar no detecte
-* Botón de detención y botón de reset
+## Características específicas de nuestra implementación
+* El bumper detectar escalones y otros objetos bajos que el lidar no puede detectar.
+* Dos botones especiales: uno de detención y otro de reset.
 * Parada de emergencia si el kobuki tiene una de sus ruedas en el aire
-* Zonas de detección dinámicas de objetos 360º
 * Rotación en ambos sentidos
+* Zonas de detección dinámicas de objetos 360º
 * Interfaz de rviz para visualizar las zonas de detección dinámicas del láser
+ <p align="center">
+  <img src="https://user-images.githubusercontent.com/92941117/221054633-e20253de-3b5b-4bb6-8d3a-7e29e10e50e5.png" width=45% height=45%>
+  <img src="https://user-images.githubusercontent.com/92941117/221054651-bd2856c3-a722-4923-b48b-be51ba99f816.png" width=45% height=45%>
+ </p>
 
-[rviz](media/rviz.mp4)
 
 * Algoritmo de detección de fin de objeto
-
-![Imagen algoritmo 1](media/algoritmo1.png)
-
-![Imagen algoritmo 2](media/algoritmo2.png)
+<p align="center">
+  <img src="media/algoritmo1.png" width=45% height=45%>
+  <img src="media/algoritmo2.png" width=45% height=45%>
+</p>
 
 * Uso de interfaz de debug en un nodo aparte. Para saber más información sobre la interfaz de debug, vaya al siguiente [repositorio](https://github.com/javizqh/Debug-Interface-Kobuki).
 
@@ -52,7 +59,9 @@ Imágenes:
 Clone el repositorio a un workspace, recomendamos clonarlo en el workspace de creado para alojar [ir_robots](https://github.com/IntelligentRoboticsLabs/ir_robots).
 A continuación, compile el código como se muestra en el video:
 
-![compile](media/compile.gif)
+<p align="center">
+    <img src="media/compile.gif" width=95% height=95%>
+</p>
 
 ```bash
     # Asegurate de estar en el workspace
@@ -61,7 +70,9 @@ A continuación, compile el código como se muestra en el video:
 
 Luego para lanzarlo siga las siguientes instrucciones:
 
-![launch](media/launch.gif)
+<p align="center">
+    <img src="media/launch.gif" width=95% height=95%>
+</p>
 
 ```bash
     # Asegurate de tener el workspace activado
@@ -80,9 +91,8 @@ state: 1" -t 1
 ```
 
 ## Problemas
-Durante la práctica hemos tenido problemas al principio para instalar ros2.
+Durante la práctica hemos tenido problemas al principio para instalar ROS2 debido a que nadie en el grupo tenía la version de Ubuntu que requería Humble.
 
-Luego, los problemas más importantes han sido los errores obtenidos al usar parametros, por lo que no los hemos podido usar al final.
+Los siguientes problemas serios a los que nos hemos tenido que enfrentar han sido los errores obtenidos al usar parametros. En programas mas pequeños los hemos implementado sin problemas, pero a medida que aumentaba la escala del código y se acercaba la fecha de entrega, se multiplicaban los errores; por lo que al final hemos decidido aplazarlos para otra version.
 
-## Otros
-Tenemos hechos más modelos aunque se encuentran incompletos en las carpetas ocultas model-*/
+El último problema que hemos tenido ha sido con un proyecto secundario que buscaba aumentar la funcionalidad del programa usando los 360 grados de rango del lidar y predecir el camino más óptimo para rodear los obstaculos o para pasar entre ellos. Pero este proyecto solo funciona de manera repetible en los simuladores, por lo que tambien ha sido apartado para una futura revisión. (Si tienes curiosidad por este modelo tambien lo tenemos incluido en el repo dentro de una carpeta oculta).
