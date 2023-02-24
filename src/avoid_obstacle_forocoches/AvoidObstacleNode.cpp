@@ -50,6 +50,7 @@ AvoidObstacleNode::AvoidObstacleNode()
     100ms, std::bind(&AvoidObstacleNode::control_cycle, this));
 
   // Set turning time
+  // If the surface has a lot of grip add 1 more second
   TURNING_TIME = (M_PI / (SPEED_TURN_ANGULAR * 2)) * 1s;
   // Initialize the last state to stop
   last_state_ = STOP;
@@ -164,6 +165,7 @@ void AvoidObstacleNode::control_cycle()
     case ROTATION:
       finished_rotation_ = false;
       out_vel_.linear.x = SPEED_FORWARD_LINEAR;
+      // If the surface has a lot of grip add 0.1 more meters/second
       out_vel_.angular.z = speed_rotation_angular_;
       // Can go to stop, forward(Turn again in the opposite direction) or turn
       if (check_2_stop()) {
@@ -489,12 +491,11 @@ double AvoidObstacleNode::set_rotation_radius(int degrees, float distance)
 void AvoidObstacleNode::set_rotation_parameters(float radius)
 {
   // Set rotation speed
-  speed_rotation_angular_ = -(obstacle_position_ * SPEED_FORWARD_LINEAR /
-    (radius * 2));
+  speed_rotation_angular_ = -(obstacle_position_ * SPEED_FORWARD_LINEAR / radius);
 
   // Set rotation time
-  // Time = circunf / SPEED_FORWARD_LINEAR
-  float time = (2 * M_PI * radius) / SPEED_FORWARD_LINEAR;
+  // Time = rad / SPEED_FORWARD_LINEAR
+  float time = (M_PI * radius) / SPEED_FORWARD_LINEAR;
   RCLCPP_INFO(get_logger(), "Speed: %f", speed_rotation_angular_);
   RCLCPP_INFO(get_logger(), "Speed time: %f", time);
   rotating_time_ = (time + 2) * 1s;
