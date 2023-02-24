@@ -49,9 +49,9 @@ Como pueden ver, nuestro robot evita obstáculos de manera eficiente y segura gr
 Algunas de las capacidades adicionales de nuestro modelo de sistema avoid-obstacles incluyen:
 
 * Un bumper detectar escalones y otros objetos bajos que el lidar no puede detectar.
-* Dos botones especiales: uno de detención y otro de reset.
+* Dos botones especiales: uno de detención (B1) y otro de reset (B0).
 * Parada de emergencia si el kobuki tiene una de sus ruedas en el aire
-* Rotación en ambos sentidos
+* Rotación en ambos sentidos: si detecta un objeto a la derecha girará a la izquierda, y viceversa.
 * Zonas de detección dinámicas de objetos 360º
 * Interfaz de rviz para visualizar las zonas de detección dinámicas del láser
 * LED's para indicar estados de paso y de emergencia
@@ -95,6 +95,8 @@ Luego para lanzarlo siga las siguientes instrucciones:
 
 ```bash
     # Asegurate de tener el workspace activado
+    # Si no esta activado usa
+    source /pathToMyWorkspace/install/setup.bash
     ros2 launch avoid_obstacle_forocoches avoid_obstacle.launch.py 
 ```
 
@@ -102,12 +104,22 @@ Si quieres usarlo en el simulador usa:
 
 ```bash
     # Asegurate de tener el workspace activado
+    # Si no esta activado usa
+    source /pathToMyWorkspace/install/setup.bash
     # Lanza el simulador en otra terminal
     ros2 launch avoid_obstacle_forocoches avoid_obstacle_sim.launch.py 
     # En otra terminal manda un topic del boton
     ros2 topic pub /events/button kobuki_ros_interfaces/msg/ButtonEvent "button: 1
 state: 1" -t 1
 ```
+## Topics usados por este modelo
+Este modelo usa 4 subscriptores para recibir información sobre el entorno. Dos de estos subscriptores son para controlar situaciones de emergencia con el bumper (/events/bumper) y para detectar si el kobuki está en el suelo con /events/wheel_drop.
+
+Luego, el modelo publica a 2 topics, uno el del nodo de depuración, que a su vez publica a otros tres más, y el otro es para controlar la velocidad y movimiento del kobuki.
+
+<p align="center">
+  <img src="media/topics.png" width="1000"/>
+</p>
 
 ## Máquina de estados implementada para este modelo
 En este diagrama de estados, se observa la diferencia entre diferentes estados de movimiento del robot, incluyendo TURN, ROTATION, FORWARD, STOP y BACKWARD. Cada uno de estos estados representa una acción específica que el robot puede tomar para evitar obstáculos y continuar navegando de manera autónoma.
